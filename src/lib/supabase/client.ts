@@ -8,5 +8,5 @@ import type { Database } from "@/lib/supabase/database.types";
 export function createClient() {
   const env = getSupabaseEnv();
   if (!env) return null;
-  return createBrowserClient<Database>(env.url, env.anonKey);
+  return createBrowserClient<Database>(env.url, env.publishableKey);
 }

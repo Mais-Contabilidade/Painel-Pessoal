@@ -8,11 +8,11 @@ export async function proxy(request: NextRequest) {
   const env = getSupabaseEnv();
   let response = NextResponse.next({ request });
 
-  // Sem Supabase configurado, o middleware não tem o que fazer — deixa passar
+  // Sem Supabase configurado, o proxy não tem o que fazer — deixa passar
   // (a própria UI mostra o estado de "integração não configurada").
   if (!env) return response;
 
-  const supabase = createServerClient(env.url, env.anonKey, {
+  const supabase = createServerClient(env.url, env.publishableKey, {
     cookies: {
       getAll() {
         return request.cookies.getAll();

@@ -13,7 +13,7 @@ export async function createClient() {
 
   const cookieStore = await cookies();
 
-  return createServerClient<Database>(env.url, env.anonKey, {
+  return createServerClient<Database>(env.url, env.publishableKey, {
     cookies: {
       getAll() {
         return cookieStore.getAll();
@@ -25,7 +25,7 @@ export async function createClient() {
           }
         } catch {
           // chamado de um Server Component sem permissão de escrever cookie —
-          // o middleware já cuida do refresh de sessão nesse caso.
+          // o proxy já cuida do refresh de sessão nesse caso.
         }
       },
     },
