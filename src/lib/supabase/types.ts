@@ -196,6 +196,18 @@ export type ReceivablePaymentRow = {
   created_at: string;
 };
 
+export type JournalEntryRow = {
+  id: string;
+  user_id: string;
+  entry_date: string;
+  day_summary: string;
+  gratitude: string;
+  reflection: string;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type InsightRow = {
   id: string;
   user_id: string;
