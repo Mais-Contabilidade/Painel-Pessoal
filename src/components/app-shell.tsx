@@ -4,14 +4,22 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { NAV_ITEMS } from "@/lib/nav-items";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { PrivacyToggle } from "@/components/ui/privacy-toggle";
+import { LogoutButton } from "@/components/auth/logout-button";
 
 function isActive(pathname: string, href: string) {
   if (href === "/") return pathname === "/";
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
+const CHROMELESS_PATHS = ["/login"];
+
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+
+  if (CHROMELESS_PATHS.some((p) => pathname.startsWith(p))) {
+    return <>{children}</>;
+  }
 
   return (
     <div className="flex min-h-dvh w-full flex-col md:flex-row">
@@ -41,10 +49,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             );
           })}
         </nav>
-        <ThemeToggle />
+        <div className="flex flex-col items-center gap-1">
+          <PrivacyToggle />
+          <ThemeToggle />
+          <LogoutButton />
+        </div>
       </aside>
 
       <div className="flex min-h-dvh flex-1 flex-col">
+        <div className="flex items-center justify-end gap-0.5 px-3 pt-2 md:hidden">
+          <PrivacyToggle />
+          <ThemeToggle />
+          <LogoutButton />
+        </div>
         <main className="flex-1 pb-24 md:pb-0">{children}</main>
       </div>
 

@@ -1,6 +1,6 @@
 -- ==========================================================================
 -- Painel Pessoal — script único para colar no SQL Editor do Supabase.
--- Gerado por concatenação EXATA dos 7 arquivos de supabase/migrations/, na
+-- Gerado por concatenação EXATA dos arquivos de supabase/migrations/, na
 -- mesma ordem — nenhuma linha de lógica foi alterada, só empacotado em uma
 -- única transação para ser tudo-ou-nada (se algo falhar, nada fica aplicado
 -- pela metade). Os arquivos individuais continuam sendo a fonte de verdade
@@ -824,5 +824,44 @@ $$;
 
 comment on function public.seed_default_workout_plan(uuid) is
   'Popula a ficha inicial padrão (A/B, 5x/semana, braços e ombros priorizados) para um usuário sem nenhum dia cadastrado. Idempotente e chamável via RPC do app.';
+
+-- ========================= 20260919090000_obligation_value_optional.sql =========================
+-- Painel Pessoal — permite cadastrar um compromisso (Pagando) com estrutura e competências
+-- definidas antes de o valor da parcela ser conhecido (ex.: "Outubro até Março, valor a definir").
+-- Sem isso o app seria forçado a inventar um valor só para satisfazer o NOT NULL, o que a
+-- regra de negócio proíbe explicitamente.
+
+alter table public.financial_obligations
+  alter column installment_value_cents drop not null;
+
+alter table public.financial_obligations
+  drop constraint if exists financial_obligations_installment_value_cents_check;
+
+alter table public.financial_obligations
+  add constraint financial_obligations_installment_value_cents_check
+  check (installment_value_cents is null or installment_value_cents > 0);
+
+-- ========================= 20260919110000_security_advisor_fixes.sql =========================
+-- Painel Pessoal — corrige os avisos do Supabase Security Advisor:
+--
+-- 1) function_search_path_mutable: toda função precisa de um search_path travado na
+--    definição (não herdado da sessão de quem chama). handle_new_user e
+--    seed_default_workout_plan já tinham `set search_path = public`; só faltava em
+--    set_updated_at.
+-- 2) SECURITY DEFINER executável por anon/authenticated: por padrão o Postgres concede
+--    EXECUTE a PUBLIC (o que inclui anon via PostgREST) em toda função nova. Nenhuma das
+--    três precisa disso — set_updated_at e handle_new_user só são chamadas por trigger
+--    (não por RPC), e seed_default_workout_plan só deve ser chamável pelo próprio usuário
+--    autenticado, nunca por anon. A checagem interna (auth.uid() = p_user_id) já barrava
+--    abuso, mas a Advisor pede o cinto e a suspensório: revogar o EXECUTE público em vez
+--    de confiar só na lógica interna.
+
+alter function public.set_updated_at() set search_path = '';
+
+revoke execute on function public.set_updated_at() from public;
+revoke execute on function public.handle_new_user() from public;
+
+revoke execute on function public.seed_default_workout_plan(uuid) from public;
+grant execute on function public.seed_default_workout_plan(uuid) to authenticated;
 
 commit;

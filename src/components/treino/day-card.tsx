@@ -5,10 +5,12 @@ import type { DayPlan } from "@/store/workout-store";
 
 export function DayCard({
   day,
+  isToday,
   onStart,
   onEdit,
 }: {
   day: DayPlan;
+  isToday?: boolean;
   onStart: () => void;
   onEdit: () => void;
 }) {
@@ -16,7 +18,11 @@ export function DayCard({
   const hasExercises = day.exercises.length > 0;
 
   return (
-    <div className="flex items-center justify-between gap-3 rounded-2xl border border-border bg-surface px-4 py-3.5">
+    <div
+      className={`flex items-center justify-between gap-3 rounded-2xl border px-4 py-3.5 ${
+        isToday ? "border-accent bg-accent-soft" : "border-border bg-surface"
+      }`}
+    >
       <button type="button" onClick={onEdit} className="min-w-0 flex-1 text-left">
         <p className="truncate text-[15px] font-medium text-text">{day.name}</p>
         <p className="mt-0.5 text-[13px] text-text-muted">

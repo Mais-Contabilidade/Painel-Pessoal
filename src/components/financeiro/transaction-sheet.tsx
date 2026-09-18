@@ -10,6 +10,7 @@ import { useFinanceStore } from "@/store/finance-store";
 import { previewWithdrawalImpact, type Goal, type TransactionType } from "@/lib/finance";
 import { formatBRL } from "@/lib/money";
 import { monthLabel } from "@/lib/month";
+import { useSupabase } from "@/lib/supabase-provider";
 
 const TYPE_OPTIONS: { value: TransactionType; label: string }[] = [
   { value: "aporte", label: "Aporte" },
@@ -30,6 +31,7 @@ export function TransactionSheet({
   initialType: TransactionType;
   onClose: () => void;
 }) {
+  const supabase = useSupabase();
   const addTransaction = useFinanceStore((s) => s.addTransaction);
   const transactions = useFinanceStore((s) => s.transactions);
 
@@ -39,13 +41,14 @@ export function TransactionSheet({
   const [note, setNote] = useState("");
   const [justification, setJustification] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   const impact = useMemo(() => {
     if (type !== "retirada" || valueCents <= 0) return null;
     return previewWithdrawalImpact(goal, transactions, valueCents);
   }, [goal, type, valueCents, transactions]);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (valueCents <= 0) {
       setError("Informe um valor maior que zero.");
       return;
@@ -54,15 +57,23 @@ export function TransactionSheet({
       setError("Explique o motivo da retirada.");
       return;
     }
-    addTransaction({
-      goalId: goal.id,
-      type,
-      value: valueCents,
-      date: new Date(date).toISOString(),
-      note: note.trim() || undefined,
-      justification: type === "retirada" ? justification.trim() : undefined,
-    });
-    onClose();
+    if (!supabase) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await addTransaction(supabase, {
+        goalId: goal.id,
+        type,
+        value: valueCents,
+        date: new Date(date).toISOString(),
+        note: note.trim() || undefined,
+        justification: type === "retirada" ? justification.trim() : undefined,
+      });
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Não foi possível salvar.");
+      setSaving(false);
+    }
   };
 
   const titles: Record<TransactionType, string> = {
@@ -126,8 +137,8 @@ export function TransactionSheet({
 
         {error && <p className="text-[13px] text-danger">{error}</p>}
 
-        <Button className="w-full" onClick={handleSave}>
-          Confirmar
+        <Button className="w-full" onClick={handleSave} disabled={saving}>
+          {saving ? "Salvando..." : "Confirmar"}
         </Button>
       </div>
     </Sheet>

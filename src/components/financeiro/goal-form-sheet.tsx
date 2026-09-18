@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { useFinanceStore } from "@/store/finance-store";
 import { currentMonthKey, addMonths, compareMonthKeys } from "@/lib/month";
 import type { Goal } from "@/lib/finance";
+import { useSupabase } from "@/lib/supabase-provider";
 
 export function GoalFormSheet({
   goal,
@@ -18,6 +19,7 @@ export function GoalFormSheet({
   onClose: () => void;
   onSaved?: (goalId: string) => void;
 }) {
+  const supabase = useSupabase();
   const addGoal = useFinanceStore((s) => s.addGoal);
   const updateGoal = useFinanceStore((s) => s.updateGoal);
 
@@ -26,8 +28,9 @@ export function GoalFormSheet({
   const [startMonth, setStartMonth] = useState(goal?.startMonth ?? currentMonthKey());
   const [endMonth, setEndMonth] = useState(goal?.endMonth ?? addMonths(currentMonthKey(), 5));
   const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!name.trim()) {
       setError("Dê um nome para a meta.");
       return;
@@ -40,14 +43,22 @@ export function GoalFormSheet({
       setError("O mês final precisa ser igual ou depois do mês inicial.");
       return;
     }
-    if (goal) {
-      updateGoal(goal.id, { name: name.trim(), targetValue, startMonth, endMonth });
-      onSaved?.(goal.id);
-    } else {
-      const created = addGoal({ name: name.trim(), targetValue, startMonth, endMonth });
-      onSaved?.(created.id);
+    if (!supabase) return;
+    setSaving(true);
+    setError(null);
+    try {
+      if (goal) {
+        await updateGoal(supabase, goal.id, { name: name.trim(), targetValue, startMonth, endMonth });
+        onSaved?.(goal.id);
+      } else {
+        const created = await addGoal(supabase, { name: name.trim(), targetValue, startMonth, endMonth });
+        onSaved?.(created.id);
+      }
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Não foi possível salvar.");
+      setSaving(false);
     }
-    onClose();
   };
 
   return (
@@ -87,8 +98,8 @@ export function GoalFormSheet({
 
         {error && <p className="text-[13px] text-danger">{error}</p>}
 
-        <Button className="w-full" onClick={handleSave}>
-          {goal ? "Salvar alterações" : "Criar meta"}
+        <Button className="w-full" onClick={handleSave} disabled={saving}>
+          {saving ? "Salvando..." : goal ? "Salvar alterações" : "Criar meta"}
         </Button>
       </div>
     </Sheet>
