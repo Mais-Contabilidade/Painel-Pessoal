@@ -12,6 +12,7 @@ import { DayCard } from "@/components/treino/day-card";
 import { EditDaySheet } from "@/components/treino/edit-day-sheet";
 import { ActiveSession } from "@/components/treino/active-session";
 import { HistoryList } from "@/components/treino/history-list";
+import { HistoryAnalytics } from "@/components/treino/history-analytics";
 import { WeekOverrideSheet } from "@/components/treino/week-override-sheet";
 import { CardioTab } from "@/components/cardio/cardio-tab";
 
@@ -111,7 +112,12 @@ export default function TreinoPage() {
 
         {tab === "cardio" && <CardioTab />}
 
-        {tab === "historico" && <HistoryList history={history} />}
+        {tab === "historico" && (
+          <>
+            <HistoryAnalytics />
+            <HistoryList history={history} />
+          </>
+        )}
       </div>
 
       <EditDaySheet day={editingDay} onClose={() => setEditingDayId(null)} />
