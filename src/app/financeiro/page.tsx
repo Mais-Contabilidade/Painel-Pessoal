@@ -10,6 +10,7 @@ import { useMounted } from "@/lib/use-mounted";
 import { computeGoalSummary } from "@/lib/finance";
 import { displayInstallmentStatus } from "@/lib/obligations";
 import { computeReceivableSummary } from "@/lib/receivables";
+import { computeFinanceTotals } from "@/lib/finance-totals";
 import { formatBRL } from "@/lib/money";
 import { monthLabel } from "@/lib/month";
 import { formatDateShort } from "@/lib/format";
@@ -39,22 +40,10 @@ export default function FinanceiroDashboardPage() {
     [receivables, payments]
   );
 
-  const totals = useMemo(() => {
-    const guardado = goalSummaries.reduce((acc, s) => acc + s.totalAllocated, 0);
-
-    let aPagar = 0;
-    for (const o of obligations.filter((o) => !o.archived)) {
-      if (!o.installmentValueCents) continue;
-      const own = installments.filter((i) => i.obligationId === o.id);
-      const unpaid = own.filter((i) => displayInstallmentStatus(i) !== "pago").length;
-      aPagar += unpaid * o.installmentValueCents;
-    }
-
-    const aReceber = receivableSummaries.reduce((acc, s) => acc + s.remaining, 0);
-    const posicaoLiquida = guardado + aReceber - aPagar;
-
-    return { guardado, aPagar, aReceber, posicaoLiquida };
-  }, [goalSummaries, obligations, installments, receivableSummaries]);
+  const totals = useMemo(
+    () => computeFinanceTotals(goals, transactions, obligations, installments, receivables, payments),
+    [goals, transactions, obligations, installments, receivables, payments]
+  );
 
   const proximosVencimentos = useMemo(() => {
     const now = new Date();

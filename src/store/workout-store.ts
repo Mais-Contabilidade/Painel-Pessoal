@@ -18,6 +18,7 @@ export type DayPlan = {
   variant: WeekVariantDb;
   weekday: number;
   name: string;
+  muscleGroups: string | null;
   exercises: ExerciseTemplate[];
 };
 
@@ -55,6 +56,7 @@ function toDayPlan(t: wq.TemplateWithExercises): DayPlan {
     variant: t.variant,
     weekday: t.weekday,
     name: t.name,
+    muscleGroups: t.muscle_groups,
     exercises: t.exercises.map((e) => ({
       id: e.id,
       name: e.name,
