@@ -1,6 +1,6 @@
 -- ==========================================================================
 -- Painel Pessoal — script único para colar no SQL Editor do Supabase.
--- Gerado por concatenação EXATA dos 7 arquivos de supabase/migrations/, na
+-- Gerado por concatenação EXATA dos arquivos de supabase/migrations/, na
 -- mesma ordem — nenhuma linha de lógica foi alterada, só empacotado em uma
 -- única transação para ser tudo-ou-nada (se algo falhar, nada fica aplicado
 -- pela metade). Os arquivos individuais continuam sendo a fonte de verdade
@@ -824,5 +824,21 @@ $$;
 
 comment on function public.seed_default_workout_plan(uuid) is
   'Popula a ficha inicial padrão (A/B, 5x/semana, braços e ombros priorizados) para um usuário sem nenhum dia cadastrado. Idempotente e chamável via RPC do app.';
+
+-- ========================= 20260919090000_obligation_value_optional.sql =========================
+-- Painel Pessoal — permite cadastrar um compromisso (Pagando) com estrutura e competências
+-- definidas antes de o valor da parcela ser conhecido (ex.: "Outubro até Março, valor a definir").
+-- Sem isso o app seria forçado a inventar um valor só para satisfazer o NOT NULL, o que a
+-- regra de negócio proíbe explicitamente.
+
+alter table public.financial_obligations
+  alter column installment_value_cents drop not null;
+
+alter table public.financial_obligations
+  drop constraint if exists financial_obligations_installment_value_cents_check;
+
+alter table public.financial_obligations
+  add constraint financial_obligations_installment_value_cents_check
+  check (installment_value_cents is null or installment_value_cents > 0);
 
 commit;

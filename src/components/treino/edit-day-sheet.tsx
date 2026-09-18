@@ -6,6 +6,7 @@ import { Sheet } from "@/components/ui/sheet";
 import { Input, Label } from "@/components/ui/field";
 import { Button } from "@/components/ui/button";
 import { useWorkoutStore, type DayPlan } from "@/store/workout-store";
+import { useSupabase } from "@/lib/supabase-provider";
 
 export function EditDaySheet({
   day,
@@ -14,6 +15,7 @@ export function EditDaySheet({
   day: DayPlan | null;
   onClose: () => void;
 }) {
+  const supabase = useSupabase();
   const renameDay = useWorkoutStore((s) => s.renameDay);
   const addExercise = useWorkoutStore((s) => s.addExercise);
   const updateExercise = useWorkoutStore((s) => s.updateExercise);
@@ -22,14 +24,18 @@ export function EditDaySheet({
 
   const [newName, setNewName] = useState("");
   const [newSets, setNewSets] = useState("3");
+  const [newRepMin, setNewRepMin] = useState("8");
+  const [newRepMax, setNewRepMax] = useState("12");
 
   if (!day) return null;
 
   const handleAdd = () => {
     const name = newName.trim();
     const sets = Math.max(1, Math.min(20, Number(newSets) || 1));
-    if (!name) return;
-    addExercise(day.id, name, sets);
+    const repMin = newRepMin ? Number(newRepMin) : null;
+    const repMax = newRepMax ? Number(newRepMax) : null;
+    if (!name || !supabase) return;
+    addExercise(supabase, day.id, name, sets, repMin, repMax);
     setNewName("");
     setNewSets("3");
   };
@@ -41,7 +47,7 @@ export function EditDaySheet({
           <Label>Nome do dia</Label>
           <Input
             defaultValue={day.name}
-            onBlur={(e) => renameDay(day.id, e.target.value.trim() || day.name)}
+            onBlur={(e) => supabase && renameDay(supabase, day.id, e.target.value.trim() || day.name)}
             placeholder="Ex: Peito e tríceps"
           />
         </div>
@@ -57,13 +63,13 @@ export function EditDaySheet({
             {day.exercises.map((ex, idx) => (
               <li
                 key={ex.id}
-                className="flex items-center gap-2 rounded-lg border border-border-subtle px-2.5 py-2"
+                className="flex flex-wrap items-center gap-2 rounded-lg border border-border-subtle px-2.5 py-2"
               >
                 <div className="flex flex-col">
                   <button
                     type="button"
                     disabled={idx === 0}
-                    onClick={() => reorderExercise(day.id, ex.id, "up")}
+                    onClick={() => supabase && reorderExercise(supabase, day.id, ex.id, "up")}
                     className="text-text-faint disabled:opacity-20 hover:text-text"
                   >
                     <ChevronUp size={14} />
@@ -71,7 +77,7 @@ export function EditDaySheet({
                   <button
                     type="button"
                     disabled={idx === day.exercises.length - 1}
-                    onClick={() => reorderExercise(day.id, ex.id, "down")}
+                    onClick={() => supabase && reorderExercise(supabase, day.id, ex.id, "down")}
                     className="text-text-faint disabled:opacity-20 hover:text-text"
                   >
                     <ChevronDown size={14} />
@@ -80,9 +86,9 @@ export function EditDaySheet({
                 <input
                   defaultValue={ex.name}
                   onBlur={(e) =>
-                    updateExercise(day.id, ex.id, { name: e.target.value.trim() || ex.name })
+                    supabase && updateExercise(supabase, day.id, ex.id, { name: e.target.value.trim() || ex.name })
                   }
-                  className="flex-1 bg-transparent text-[14px] text-text outline-none"
+                  className="min-w-0 flex-1 bg-transparent text-[14px] text-text outline-none"
                 />
                 <input
                   type="number"
@@ -90,17 +96,49 @@ export function EditDaySheet({
                   max={20}
                   defaultValue={ex.sets}
                   onBlur={(e) =>
-                    updateExercise(day.id, ex.id, {
+                    supabase &&
+                    updateExercise(supabase, day.id, ex.id, {
                       sets: Math.max(1, Math.min(20, Number(e.target.value) || 1)),
                     })
                   }
-                  className="w-12 rounded-md bg-surface-2 px-1.5 py-1 text-center text-[13px] text-text outline-none"
+                  className="w-11 rounded-md bg-surface-2 px-1.5 py-1 text-center text-[13px] text-text outline-none"
                   aria-label="Número de séries"
+                  title="Séries"
                 />
                 <span className="text-[11px] text-text-faint">séries</span>
+                <input
+                  type="number"
+                  min={1}
+                  defaultValue={ex.repMin ?? ""}
+                  placeholder="min"
+                  onBlur={(e) =>
+                    supabase &&
+                    updateExercise(supabase, day.id, ex.id, {
+                      repMin: e.target.value ? Number(e.target.value) : null,
+                    })
+                  }
+                  className="w-11 rounded-md bg-surface-2 px-1.5 py-1 text-center text-[13px] text-text outline-none"
+                  aria-label="Repetições mínimas"
+                />
+                <span className="text-[11px] text-text-faint">–</span>
+                <input
+                  type="number"
+                  min={1}
+                  defaultValue={ex.repMax ?? ""}
+                  placeholder="max"
+                  onBlur={(e) =>
+                    supabase &&
+                    updateExercise(supabase, day.id, ex.id, {
+                      repMax: e.target.value ? Number(e.target.value) : null,
+                    })
+                  }
+                  className="w-11 rounded-md bg-surface-2 px-1.5 py-1 text-center text-[13px] text-text outline-none"
+                  aria-label="Repetições máximas"
+                />
+                <span className="text-[11px] text-text-faint">reps</span>
                 <button
                   type="button"
-                  onClick={() => removeExercise(day.id, ex.id)}
+                  onClick={() => supabase && removeExercise(supabase, day.id, ex.id)}
                   aria-label="Remover exercício"
                   className="text-text-faint hover:text-danger"
                 >
@@ -111,30 +149,31 @@ export function EditDaySheet({
           </ul>
         </div>
 
-        <div className="flex items-end gap-2 border-t border-border-subtle pt-4">
-          <div className="flex-1">
-            <Label>Novo exercício</Label>
-            <Input
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-              placeholder="Ex: Supino reto"
-              onKeyDown={(e) => e.key === "Enter" && handleAdd()}
-            />
+        <div className="space-y-2 border-t border-border-subtle pt-4">
+          <Label>Novo exercício</Label>
+          <Input
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            placeholder="Ex: Supino reto"
+            onKeyDown={(e) => e.key === "Enter" && handleAdd()}
+          />
+          <div className="flex items-end gap-2">
+            <div className="w-16">
+              <Label>Séries</Label>
+              <Input type="number" min={1} max={20} value={newSets} onChange={(e) => setNewSets(e.target.value)} />
+            </div>
+            <div className="w-16">
+              <Label>Reps min</Label>
+              <Input type="number" min={1} value={newRepMin} onChange={(e) => setNewRepMin(e.target.value)} />
+            </div>
+            <div className="w-16">
+              <Label>Reps max</Label>
+              <Input type="number" min={1} value={newRepMax} onChange={(e) => setNewRepMax(e.target.value)} />
+            </div>
+            <Button size="md" variant="secondary" onClick={handleAdd} aria-label="Adicionar exercício">
+              <Plus size={17} />
+            </Button>
           </div>
-          <div className="w-16">
-            <Label>Séries</Label>
-            <Input
-              type="number"
-              min={1}
-              max={20}
-              value={newSets}
-              onChange={(e) => setNewSets(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleAdd()}
-            />
-          </div>
-          <Button size="md" variant="secondary" onClick={handleAdd} aria-label="Adicionar exercício">
-            <Plus size={17} />
-          </Button>
         </div>
 
         <Button className="w-full" onClick={onClose}>

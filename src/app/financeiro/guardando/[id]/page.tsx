@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, ArrowDownCircle, ArrowUpCircle, Pencil, Sparkles, Trash2 } from "lucide-react";
 import { useFinanceStore } from "@/store/finance-store";
 import { useMounted } from "@/lib/use-mounted";
+import { useSupabase } from "@/lib/supabase-provider";
 import { computeGoalSummary, type TransactionType } from "@/lib/finance";
 import { formatBRL } from "@/lib/money";
 import { monthLabelLong } from "@/lib/month";
@@ -12,6 +13,7 @@ import { formatDateShort } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Sheet } from "@/components/ui/sheet";
+import { PrivateValue } from "@/components/ui/private-value";
 import { MonthRow } from "@/components/financeiro/month-row";
 import { GoalFormSheet } from "@/components/financeiro/goal-form-sheet";
 import { TransactionSheet } from "@/components/financeiro/transaction-sheet";
@@ -38,6 +40,7 @@ export default function GoalDetailPage() {
   const mounted = useMounted();
   const router = useRouter();
   const params = useParams<{ id: string }>();
+  const supabase = useSupabase();
   const goals = useFinanceStore((s) => s.goals);
   const transactions = useFinanceStore((s) => s.transactions);
   const deleteGoal = useFinanceStore((s) => s.deleteGoal);
@@ -63,7 +66,7 @@ export default function GoalDetailPage() {
   if (!goal || !summary) {
     return (
       <div className="px-5 pt-6">
-        <button onClick={() => router.push("/financeiro")} className="flex items-center gap-1 text-[13.5px] text-text-muted">
+        <button onClick={() => router.push("/financeiro/guardando")} className="flex items-center gap-1 text-[13.5px] text-text-muted">
           <ArrowLeft size={15} /> Voltar
         </button>
         <p className="mt-6 text-[13.5px] text-text-muted">Meta não encontrada.</p>
@@ -77,7 +80,7 @@ export default function GoalDetailPage() {
     <div className="px-5 pt-6 pb-8">
       <div className="flex items-center justify-between">
         <button
-          onClick={() => router.push("/financeiro")}
+          onClick={() => router.push("/financeiro/guardando")}
           aria-label="Voltar"
           className="flex h-8 w-8 items-center justify-center rounded-full text-text-muted hover:bg-surface-2 hover:text-text"
         >
@@ -108,14 +111,22 @@ export default function GoalDetailPage() {
 
       <div className="mt-4 rounded-2xl border border-border bg-surface p-4">
         <div className="flex items-baseline justify-between">
-          <p className="text-[22px] font-semibold text-text">{formatBRL(summary.totalAllocated)}</p>
-          <p className="text-[13px] text-text-muted">de {formatBRL(summary.targetValue)}</p>
+          <p className="text-[22px] font-semibold text-text">
+            <PrivateValue>{formatBRL(summary.totalAllocated)}</PrivateValue>
+          </p>
+          <p className="text-[13px] text-text-muted">
+            de <PrivateValue>{formatBRL(summary.targetValue)}</PrivateValue>
+          </p>
         </div>
         <Progress value={pct} className="mt-2.5" />
         <div className="mt-3 flex items-center justify-between text-[12.5px] text-text-muted">
-          <span>Falta {formatBRL(summary.totalRemaining)}</span>
+          <span>
+            Falta <PrivateValue>{formatBRL(summary.totalRemaining)}</PrivateValue>
+          </span>
           {summary.totalRendimentos > 0 && (
-            <span className="text-accent">+{formatBRL(summary.totalRendimentos)} rendimento CDI</span>
+            <span className="text-accent">
+              +<PrivateValue>{formatBRL(summary.totalRendimentos)}</PrivateValue> rendimento CDI
+            </span>
           )}
         </div>
       </div>
@@ -155,7 +166,7 @@ export default function GoalDetailPage() {
                   <Icon size={17} className={`shrink-0 ${TX_COLOR[t.type]}`} />
                   <div className="min-w-0 flex-1">
                     <p className="text-[13.5px] text-text">
-                      {TX_LABEL[t.type]} · {formatBRL(t.value)}
+                      {TX_LABEL[t.type]} · <PrivateValue>{formatBRL(t.value)}</PrivateValue>
                     </p>
                     <p className="truncate text-[12px] text-text-muted">
                       {formatDateShort(t.date)}
@@ -163,7 +174,7 @@ export default function GoalDetailPage() {
                     </p>
                   </div>
                   <button
-                    onClick={() => deleteTransaction(t.id)}
+                    onClick={() => supabase && deleteTransaction(supabase, t.id)}
                     aria-label="Remover lançamento"
                     className="shrink-0 text-text-faint hover:text-danger"
                   >
@@ -193,9 +204,10 @@ export default function GoalDetailPage() {
             <Button
               variant="danger"
               className="flex-1"
-              onClick={() => {
-                deleteGoal(goal.id);
-                router.push("/financeiro");
+              onClick={async () => {
+                if (!supabase) return;
+                await deleteGoal(supabase, goal.id);
+                router.push("/financeiro/guardando");
               }}
             >
               Excluir

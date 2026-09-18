@@ -1,4 +1,5 @@
 import { Progress } from "@/components/ui/progress";
+import { PrivateValue } from "@/components/ui/private-value";
 import { formatBRL } from "@/lib/money";
 import type { GoalSummary } from "@/lib/finance";
 
@@ -25,7 +26,7 @@ export function GoalCard({ summary, onOpen }: { summary: GoalSummary; onOpen: ()
         ) : null}
       </div>
       <p className="mt-0.5 text-[13px] text-text-muted">
-        {formatBRL(totalAllocated)} de {formatBRL(targetValue)}
+        <PrivateValue>{`${formatBRL(totalAllocated)} de ${formatBRL(targetValue)}`}</PrivateValue>
       </p>
       <Progress value={pct} className="mt-2.5" />
     </button>

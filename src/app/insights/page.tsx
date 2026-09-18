@@ -13,6 +13,7 @@ import { InsightEditorSheet } from "@/components/insights/insight-editor-sheet";
 export default function InsightsPage() {
   const mounted = useMounted();
   const insights = useInsightsStore((s) => s.insights);
+  const status = useInsightsStore((s) => s.status);
 
   const [query, setQuery] = useState("");
   const [activeTags, setActiveTags] = useState<string[]>([]);
@@ -93,7 +94,11 @@ export default function InsightsPage() {
       </div>
 
       <div className="px-5 pt-4 pb-6">
-        {filtered.length === 0 ? (
+        {status === "loading" ? (
+          <div className="flex flex-col items-center gap-2 py-16 text-center">
+            <p className="text-[13.5px] text-text-muted">Carregando...</p>
+          </div>
+        ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center gap-2 py-16 text-center">
             <p className="text-[13.5px] text-text-muted">
               {insights.length === 0

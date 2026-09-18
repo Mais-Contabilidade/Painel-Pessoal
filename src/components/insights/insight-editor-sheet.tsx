@@ -7,6 +7,7 @@ import { Input, Label, Textarea } from "@/components/ui/field";
 import { Button } from "@/components/ui/button";
 import { TagInput } from "@/components/insights/tag-input";
 import { useInsightsStore, type Insight } from "@/store/insights-store";
+import { useSupabase } from "@/lib/supabase-provider";
 
 export function InsightEditorSheet({
   insight,
@@ -15,6 +16,7 @@ export function InsightEditorSheet({
   insight: Insight | "new";
   onClose: () => void;
 }) {
+  const supabase = useSupabase();
   const addInsight = useInsightsStore((s) => s.addInsight);
   const updateInsight = useInsightsStore((s) => s.updateInsight);
   const toggleFavorite = useInsightsStore((s) => s.toggleFavorite);
@@ -29,17 +31,26 @@ export function InsightEditorSheet({
   const [content, setContent] = useState(isNew ? "" : insight.content);
   const [tags, setTags] = useState<string[]>(isNew ? [] : insight.tags);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const canSave = content.trim().length > 0;
 
-  const handleSave = () => {
-    if (!canSave) return;
-    if (isNew) {
-      addInsight({ title, content: content.trim(), tags });
-    } else {
-      updateInsight(insight.id, { title, content: content.trim(), tags });
+  const handleSave = async () => {
+    if (!canSave || !supabase) return;
+    setSaving(true);
+    setError(null);
+    try {
+      if (isNew) {
+        await addInsight(supabase, { title, content: content.trim(), tags });
+      } else {
+        await updateInsight(supabase, insight.id, { title, content: content.trim(), tags });
+      }
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Não foi possível salvar.");
+      setSaving(false);
     }
-    onClose();
   };
 
   return (
@@ -68,7 +79,7 @@ export function InsightEditorSheet({
           {!isNew && (
             <button
               type="button"
-              onClick={() => toggleFavorite(insight.id)}
+              onClick={() => supabase && toggleFavorite(supabase, insight.id)}
               className={`flex h-9 w-9 items-center justify-center rounded-full transition-colors ${
                 liveFavorite ? "text-warning" : "text-text-faint hover:text-text"
               }`}
@@ -87,10 +98,12 @@ export function InsightEditorSheet({
               <Trash2 size={17} />
             </button>
           )}
-          <Button className="ml-auto" disabled={!canSave} onClick={handleSave}>
-            Salvar
+          <Button className="ml-auto" disabled={!canSave || saving} onClick={handleSave}>
+            {saving ? "Salvando..." : "Salvar"}
           </Button>
         </div>
+
+        {error && <p className="text-[13px] text-danger">{error}</p>}
 
         {confirmDelete && !isNew && (
           <div className="rounded-lg border border-danger-soft bg-danger-soft p-3">
@@ -108,8 +121,9 @@ export function InsightEditorSheet({
                 variant="danger"
                 size="sm"
                 className="flex-1"
-                onClick={() => {
-                  deleteInsight(insight.id);
+                onClick={async () => {
+                  if (!supabase) return;
+                  await deleteInsight(supabase, insight.id);
                   onClose();
                 }}
               >
