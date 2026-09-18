@@ -2,8 +2,8 @@ import { create } from "zustand";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getCurrentUserId } from "@/lib/supabase/current-user";
 import * as rq from "@/lib/supabase/queries/receivables";
-import type { Receivable, ReceivablePayment } from "@/lib/receivables";
-import type { ReceivableRow, ReceivablePaymentRow } from "@/lib/supabase/types";
+import type { Receivable, ReceivablePayment, ReceivableInstallment } from "@/lib/receivables";
+import type { ReceivableRow, ReceivablePaymentRow, ReceivableInstallmentRow, ReceivableReturnMode } from "@/lib/supabase/types";
 
 function toReceivable(row: ReceivableRow): Receivable {
   return {
@@ -14,6 +14,19 @@ function toReceivable(row: ReceivableRow): Receivable {
     agreedReturnDate: row.agreed_return_date,
     notes: row.notes,
     archived: row.archived,
+    returnMode: row.return_mode,
+    installmentsCount: row.installments_count,
+    firstDueDate: row.first_due_date,
+  };
+}
+
+function toInstallment(row: ReceivableInstallmentRow): ReceivableInstallment {
+  return {
+    id: row.id,
+    receivableId: row.receivable_id,
+    installmentNumber: row.installment_number,
+    dueDate: row.due_date,
+    valueCents: row.value_cents,
   };
 }
 
@@ -34,12 +47,23 @@ type ReceivablesState = {
   errorMessage: string | null;
   receivables: Receivable[];
   payments: ReceivablePayment[];
+  installments: ReceivableInstallment[];
 
   initialize: (supabase: SupabaseClient) => Promise<void>;
   addReceivable: (
     supabase: SupabaseClient,
-    input: { person: string; originalValueCents: number; lentOn: string; agreedReturnDate: string | null; notes?: string }
+    input: {
+      person: string;
+      originalValueCents: number;
+      lentOn: string;
+      agreedReturnDate: string | null;
+      notes?: string;
+      returnMode?: ReceivableReturnMode;
+      installmentsCount?: number | null;
+      firstDueDate?: string | null;
+    }
   ) => Promise<Receivable>;
+  updateInstallmentValue: (supabase: SupabaseClient, id: string, valueCents: number) => Promise<void>;
   updateReceivable: (
     supabase: SupabaseClient,
     id: string,
@@ -58,15 +82,22 @@ export const useReceivablesStore = create<ReceivablesState>()((set) => ({
   errorMessage: null,
   receivables: [],
   payments: [],
+  installments: [],
 
   initialize: async (supabase) => {
     set({ status: "loading", errorMessage: null });
     try {
-      const [receivables, payments] = await Promise.all([
+      const [receivables, payments, installments] = await Promise.all([
         rq.fetchReceivables(supabase),
         rq.fetchReceivablePayments(supabase),
+        rq.fetchReceivableInstallments(supabase),
       ]);
-      set({ status: "ready", receivables: receivables.map(toReceivable), payments: payments.map(toPayment) });
+      set({
+        status: "ready",
+        receivables: receivables.map(toReceivable),
+        payments: payments.map(toPayment),
+        installments: installments.map(toInstallment),
+      });
     } catch (err) {
       set({ status: "error", errorMessage: err instanceof Error ? err.message : "Erro ao carregar empréstimos." });
     }
@@ -76,8 +107,23 @@ export const useReceivablesStore = create<ReceivablesState>()((set) => ({
     const userId = await getCurrentUserId(supabase);
     const created = await rq.insertReceivable(supabase, userId, input);
     const mapped = toReceivable(created);
-    set((state) => ({ receivables: [...state.receivables, mapped] }));
+    let newInstallments: ReceivableInstallment[] = [];
+    if (input.returnMode === "parcelado") {
+      newInstallments = (await rq.fetchReceivableInstallments(supabase))
+        .filter((r) => r.receivable_id === created.id)
+        .map(toInstallment);
+    }
+    set((state) => ({
+      receivables: [...state.receivables, mapped],
+      installments: [...state.installments, ...newInstallments],
+    }));
     return mapped;
+  },
+
+  updateInstallmentValue: async (supabase, id, valueCents) => {
+    const updated = await rq.updateReceivableInstallmentValue(supabase, id, valueCents);
+    const mapped = toInstallment(updated);
+    set((state) => ({ installments: state.installments.map((i) => (i.id === id ? mapped : i)) }));
   },
 
   updateReceivable: async (supabase, id, updates) => {
@@ -95,6 +141,7 @@ export const useReceivablesStore = create<ReceivablesState>()((set) => ({
     set((state) => ({
       receivables: state.receivables.filter((r) => r.id !== id),
       payments: state.payments.filter((p) => p.receivableId !== id),
+      installments: state.installments.filter((i) => i.receivableId !== id),
     }));
   },
 

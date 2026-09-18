@@ -95,6 +95,7 @@ export type ProfileRow = {
   email: string;
   display_name: string | null;
   avatar_url: string | null;
+  avatar_path: string | null;
   migrated_from_local_at: string | null;
   created_at: string;
   updated_at: string;
@@ -157,6 +158,8 @@ export type FinancialInstallmentRow = {
   created_at: string;
 };
 
+export type ReceivableReturnMode = "avista" | "parcelado";
+
 export type ReceivableRow = {
   id: string;
   user_id: string;
@@ -166,8 +169,21 @@ export type ReceivableRow = {
   agreed_return_date: string | null;
   notes: string | null;
   archived: boolean;
+  return_mode: ReceivableReturnMode;
+  installments_count: number | null;
+  first_due_date: string | null;
   created_at: string;
   updated_at: string;
+};
+
+export type ReceivableInstallmentRow = {
+  id: string;
+  user_id: string;
+  receivable_id: string;
+  installment_number: number;
+  due_date: string;
+  value_cents: number;
+  created_at: string;
 };
 
 export type ReceivablePaymentRow = {

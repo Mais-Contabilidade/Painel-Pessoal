@@ -6,6 +6,7 @@ import { NAV_ITEMS } from "@/lib/nav-items";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { PrivacyToggle } from "@/components/ui/privacy-toggle";
 import { LogoutButton } from "@/components/auth/logout-button";
+import { AvatarButton } from "@/components/profile/avatar-button";
 
 function isActive(pathname: string, href: string) {
   if (href === "/") return pathname === "/";
@@ -24,7 +25,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-dvh w-full flex-col md:flex-row">
       <aside className="hidden md:flex md:w-[72px] md:flex-col md:items-center md:border-r md:border-border md:py-5">
-        <div className="mb-6 h-8 w-8 rounded-lg bg-accent" aria-hidden />
+        <div className="mb-6">
+          <AvatarButton size={32} />
+        </div>
         <nav className="flex flex-1 flex-col items-center gap-1">
           {NAV_ITEMS.map((item) => {
             const active = isActive(pathname, item.href);
@@ -57,10 +60,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </aside>
 
       <div className="flex min-h-dvh flex-1 flex-col">
-        <div className="flex items-center justify-end gap-0.5 px-3 pt-2 md:hidden">
-          <PrivacyToggle />
-          <ThemeToggle />
-          <LogoutButton />
+        <div className="flex items-center justify-between px-3 pt-2 md:hidden">
+          <AvatarButton size={28} />
+          <div className="flex items-center gap-0.5">
+            <PrivacyToggle />
+            <ThemeToggle />
+            <LogoutButton />
+          </div>
         </div>
         <main className="flex-1 pb-24 md:pb-0">{children}</main>
       </div>
