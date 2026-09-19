@@ -2,15 +2,17 @@
 
 import { Eye, EyeOff } from "lucide-react";
 import { usePrivacyStore } from "@/store/privacy-store";
+import { useSupabase } from "@/lib/supabase-provider";
 
 export function PrivacyToggle({ className }: { className?: string }) {
+  const supabase = useSupabase();
   const visible = usePrivacyStore((s) => s.financialValuesVisible);
   const toggle = usePrivacyStore((s) => s.toggle);
 
   return (
     <button
       type="button"
-      onClick={toggle}
+      onClick={() => supabase && toggle(supabase)}
       aria-label={visible ? "Ocultar valores financeiros" : "Mostrar valores financeiros"}
       title={visible ? "Ocultar valores" : "Mostrar valores"}
       className={`flex h-9 w-9 items-center justify-center rounded-full text-text-muted transition-colors hover:bg-surface-2 hover:text-text ${className ?? ""}`}

@@ -24,8 +24,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-dvh w-full flex-col md:flex-row">
-      <aside className="hidden md:flex md:w-[72px] md:flex-col md:items-center md:border-r md:border-border md:py-5">
-        <div className="mb-6">
+      <aside className="hidden md:sticky md:top-0 md:z-30 md:flex md:h-dvh md:w-[72px] md:shrink-0 md:flex-col md:items-center md:overflow-y-auto md:border-r md:border-border md:py-5">
+        <div className="mb-6 shrink-0">
           <AvatarButton size={32} />
         </div>
         <nav className="flex flex-1 flex-col items-center gap-1">
@@ -52,7 +52,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             );
           })}
         </nav>
-        <div className="flex flex-col items-center gap-1">
+        <div className="flex shrink-0 flex-col items-center gap-1">
           <PrivacyToggle />
           <ThemeToggle />
           <LogoutButton />

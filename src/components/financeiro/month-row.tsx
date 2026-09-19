@@ -1,6 +1,7 @@
 import type { MonthPlan } from "@/lib/finance";
 import { formatBRL } from "@/lib/money";
 import { monthLabel } from "@/lib/month";
+import { PrivateValue } from "@/components/ui/private-value";
 
 const STATUS_STYLES: Record<MonthPlan["status"], string> = {
   completo: "text-success",
@@ -32,11 +33,15 @@ export function MonthRow({ month }: { month: MonthPlan }) {
       </div>
       <div className="text-right">
         <p className="text-[13.5px] font-medium text-text">
-          {formatBRL(month.allocated)}{" "}
-          <span className="font-normal text-text-faint">/ {formatBRL(month.planned)}</span>
+          <PrivateValue>
+            {formatBRL(month.allocated)}{" "}
+            <span className="font-normal text-text-faint">/ {formatBRL(month.planned)}</span>
+          </PrivateValue>
         </p>
         {month.remaining > 0 && (
-          <p className="mt-0.5 text-[11.5px] text-text-muted">faltam {formatBRL(month.remaining)}</p>
+          <p className="mt-0.5 text-[11.5px] text-text-muted">
+            faltam <PrivateValue>{formatBRL(month.remaining)}</PrivateValue>
+          </p>
         )}
       </div>
     </div>

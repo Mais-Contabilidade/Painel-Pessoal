@@ -11,6 +11,7 @@ import { useObligationsStore } from "@/store/obligations-store";
 import { useReceivablesStore } from "@/store/receivables-store";
 import { useProfileStore } from "@/store/profile-store";
 import { useJournalStore } from "@/store/journal-store";
+import { usePrivacyStore } from "@/store/privacy-store";
 
 const SupabaseContext = createContext<SupabaseClient | null>(null);
 
@@ -34,6 +35,7 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
     useReceivablesStore.getState().initialize(supabase);
     useProfileStore.getState().initialize(supabase);
     useJournalStore.getState().initialize(supabase);
+    usePrivacyStore.getState().initialize(supabase);
   }, [supabase]);
 
   return <SupabaseContext.Provider value={supabase}>{children}</SupabaseContext.Provider>;
