@@ -16,7 +16,7 @@ import { monthLabel } from "@/lib/month";
 import { formatDateShort } from "@/lib/format";
 import { PageHeader } from "@/components/ui/page-header";
 import { Progress } from "@/components/ui/progress";
-import { PrivateValue } from "@/components/ui/private-value";
+import { PrivateValue, PrivatePercent } from "@/components/ui/private-value";
 
 export default function FinanceiroDashboardPage() {
   const mounted = useMounted();
@@ -141,7 +141,9 @@ export default function FinanceiroDashboardPage() {
                   <div className="flex items-center justify-between">
                     <p className="text-[13px] text-text">{s.goal.name}</p>
                     <p className="text-[12px] text-text-muted">
-                      {s.targetValue > 0 ? Math.round((s.totalAllocated / s.targetValue) * 100) : 0}%
+                      <PrivatePercent>
+                        {s.targetValue > 0 ? Math.round((s.totalAllocated / s.targetValue) * 100) : 0}%
+                      </PrivatePercent>
                     </p>
                   </div>
                   <Progress

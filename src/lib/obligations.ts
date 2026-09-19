@@ -77,3 +77,20 @@ export function computeObligationProgress(installments: Installment[], today = n
     nextInstallment,
   };
 }
+
+/** Saldo restante do compromisso. Retorna null quando o valor é genuinamente "a definir" — nunca inventa número. */
+export function computeObligationRemaining(
+  obligation: Pick<Obligation, "totalValueCents" | "installmentValueCents">,
+  installments: Installment[],
+  today = new Date()
+): Cents | null {
+  if (obligation.totalValueCents != null) {
+    const paid = installments.reduce((acc, i) => acc + (i.paidValueCents ?? 0), 0);
+    return Math.max(0, obligation.totalValueCents - paid);
+  }
+  if (obligation.installmentValueCents != null) {
+    const remainingCount = installments.filter((i) => displayInstallmentStatus(i, today) !== "pago").length;
+    return remainingCount * obligation.installmentValueCents;
+  }
+  return null;
+}
