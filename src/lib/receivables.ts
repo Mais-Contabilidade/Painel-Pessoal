@@ -1,4 +1,5 @@
 import type { Cents } from "@/lib/money";
+import type { ReceivableReturnMode } from "@/lib/supabase/types";
 
 export type Receivable = {
   id: string;
@@ -8,6 +9,17 @@ export type Receivable = {
   agreedReturnDate: string | null;
   notes: string | null;
   archived: boolean;
+  returnMode: ReceivableReturnMode;
+  installmentsCount: number | null;
+  firstDueDate: string | null;
+};
+
+export type ReceivableInstallment = {
+  id: string;
+  receivableId: string;
+  installmentNumber: number;
+  dueDate: string;
+  valueCents: Cents;
 };
 
 export type ReceivablePayment = {
@@ -54,4 +66,76 @@ export function computeReceivableSummary(
   }
 
   return { receivable, totalReceived, remaining, status };
+}
+
+/**
+ * Gera o cronograma previsto de parcelas (mensal, a partir de firstDueDate),
+ * dividindo o valor total igualmente e jogando o resto de centavos na
+ * última parcela para a soma bater exatamente com originalValueCents.
+ */
+export function generateInstallmentSchedule(
+  totalValueCents: Cents,
+  installmentsCount: number,
+  firstDueDate: string
+): { installmentNumber: number; dueDate: string; valueCents: Cents }[] {
+  if (installmentsCount <= 0) return [];
+  const base = Math.floor(totalValueCents / installmentsCount);
+  const remainder = totalValueCents - base * installmentsCount;
+  const [y, m, d] = firstDueDate.split("-").map(Number);
+  return Array.from({ length: installmentsCount }, (_, i) => {
+    const date = new Date(Date.UTC(y, m - 1 + i, d));
+    const dueDate = date.toISOString().slice(0, 10);
+    const valueCents = base + (i === installmentsCount - 1 ? remainder : 0);
+    return { installmentNumber: i + 1, dueDate, valueCents };
+  });
+}
+
+export type InstallmentAllocationStatus = "pago" | "parcial" | "pendente" | "atrasado";
+
+export type InstallmentAllocation = ReceivableInstallment & {
+  status: InstallmentAllocationStatus;
+  paidCents: Cents;
+  remainingCents: Cents;
+};
+
+/**
+ * Aloca o total recebido (waterfall, na ordem das parcelas) contra o
+ * cronograma previsto. Não vincula um recebimento específico a uma parcela
+ * específica — recebimento real (receivable_payments) continua sendo só um
+ * registro em dinheiro; o cronograma é só a "previsão" contra a qual o
+ * progresso é medido.
+ */
+export function allocateReceivableInstallments(
+  installments: ReceivableInstallment[],
+  totalReceivedCents: Cents,
+  today = new Date()
+): InstallmentAllocation[] {
+  const sorted = [...installments].sort((a, b) => a.installmentNumber - b.installmentNumber);
+  let pool = totalReceivedCents;
+  return sorted.map((inst) => {
+    const paidCents = Math.max(0, Math.min(inst.valueCents, pool));
+    pool -= paidCents;
+    const remainingCents = inst.valueCents - paidCents;
+    let status: InstallmentAllocationStatus;
+    if (remainingCents <= 0) status = "pago";
+    else if (paidCents > 0) status = "parcial";
+    else if (daysUntil(inst.dueDate, today) < 0) status = "atrasado";
+    else status = "pendente";
+    return { ...inst, status, paidCents, remainingCents };
+  });
+}
+
+export type InstallmentPlanProgress = {
+  totalCount: number;
+  paidCount: number;
+  overdueCount: number;
+  nextInstallment: InstallmentAllocation | null;
+};
+
+export function computeInstallmentPlanProgress(allocations: InstallmentAllocation[]): InstallmentPlanProgress {
+  const totalCount = allocations.length;
+  const paidCount = allocations.filter((a) => a.status === "pago").length;
+  const overdueCount = allocations.filter((a) => a.status === "atrasado").length;
+  const nextInstallment = allocations.find((a) => a.status !== "pago") ?? null;
+  return { totalCount, paidCount, overdueCount, nextInstallment };
 }

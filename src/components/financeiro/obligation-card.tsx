@@ -2,7 +2,13 @@ import { Progress } from "@/components/ui/progress";
 import { PrivateValue } from "@/components/ui/private-value";
 import { formatBRL } from "@/lib/money";
 import { monthLabel } from "@/lib/month";
-import { computeObligationProgress, type Obligation, type Installment } from "@/lib/obligations";
+import { formatDateShort } from "@/lib/format";
+import {
+  computeObligationProgress,
+  computeObligationRemaining,
+  type Obligation,
+  type Installment,
+} from "@/lib/obligations";
 
 export function ObligationCard({
   obligation,
@@ -14,6 +20,7 @@ export function ObligationCard({
   onOpen: () => void;
 }) {
   const progress = computeObligationProgress(installments);
+  const remaining = computeObligationRemaining(obligation, installments);
 
   return (
     <button
@@ -28,7 +35,10 @@ export function ObligationCard({
         </div>
         <p className="shrink-0 text-[13px] font-medium text-text">
           {obligation.installmentValueCents ? (
-            <PrivateValue>{formatBRL(obligation.installmentValueCents)}</PrivateValue>
+            <>
+              <PrivateValue>{formatBRL(obligation.installmentValueCents)}</PrivateValue>
+              <span className="text-text-faint">/mês</span>
+            </>
           ) : (
             <span className="text-text-faint">a definir</span>
           )}
@@ -37,14 +47,23 @@ export function ObligationCard({
       <div className="mt-2.5 flex items-center gap-2">
         <Progress value={progress.percentPaid} className="flex-1" />
         <span className="shrink-0 text-[12px] text-text-muted">
-          {progress.paidCount}/{progress.totalCount}
+          {progress.paidCount}/{progress.totalCount} pagas
         </span>
       </div>
-      {progress.nextInstallment && (
-        <p className="mt-1.5 text-[12px] text-text-faint">
-          Próxima: {monthLabel(progress.nextInstallment.competenceMonth)}
-        </p>
-      )}
+      <div className="mt-1.5 flex items-center justify-between text-[12px] text-text-faint">
+        {progress.nextInstallment ? (
+          <span>
+            Próxima: {progress.nextInstallment.dueDate ? formatDateShort(progress.nextInstallment.dueDate) : monthLabel(progress.nextInstallment.competenceMonth)}
+          </span>
+        ) : (
+          <span>Quitado</span>
+        )}
+        {remaining !== null && (
+          <span>
+            Restante: <PrivateValue>{formatBRL(remaining)}</PrivateValue>
+          </span>
+        )}
+      </div>
     </button>
   );
 }

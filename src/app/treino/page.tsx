@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, AlertTriangle } from "lucide-react";
 import { useWorkoutStore } from "@/store/workout-store";
 import { useSupabase } from "@/lib/supabase-provider";
 import { useMounted } from "@/lib/use-mounted";
@@ -21,6 +21,8 @@ export default function TreinoPage() {
   const supabase = useSupabase();
   const plan = useWorkoutStore((s) => s.plan);
   const status = useWorkoutStore((s) => s.status);
+  const errorMessage = useWorkoutStore((s) => s.errorMessage);
+  const initialize = useWorkoutStore((s) => s.initialize);
   const activeSession = useWorkoutStore((s) => s.activeSession);
   const history = useWorkoutStore((s) => s.history);
   const weekOverrides = useWorkoutStore((s) => s.weekOverrides);
@@ -67,11 +69,27 @@ export default function TreinoPage() {
       />
 
       <div className="px-5 pb-6">
-        {tab === "treinos" && status === "loading" && (
+        {tab === "treinos" && (status === "loading" || status === "idle") && (
           <p className="py-16 text-center text-[13.5px] text-text-muted">Carregando...</p>
         )}
 
-        {tab === "treinos" && status !== "loading" && (
+        {tab === "treinos" && status === "error" && (
+          <div className="flex flex-col items-center gap-3 py-16 text-center">
+            <AlertTriangle size={22} className="text-danger" />
+            <p className="text-[13.5px] text-text-muted">
+              {errorMessage ?? "Não foi possível carregar o treino."}
+            </p>
+            <button
+              type="button"
+              onClick={() => supabase && initialize(supabase)}
+              className="rounded-lg border border-border px-3 py-1.5 text-[13px] font-medium text-text transition-colors hover:bg-surface-2"
+            >
+              Tentar novamente
+            </button>
+          </div>
+        )}
+
+        {tab === "treinos" && status === "ready" && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <Segmented
@@ -93,17 +111,30 @@ export default function TreinoPage() {
               </button>
             </div>
 
-            <div className="space-y-2">
-              {daysForVariant.map((day) => (
-                <DayCard
-                  key={day.id}
-                  day={day}
-                  isToday={shownVariant === resolvedVariant && day.weekday === todayWeekday}
-                  onStart={() => supabase && startSession(supabase, day.id)}
-                  onEdit={() => setEditingDayId(day.id)}
-                />
-              ))}
-            </div>
+            {plan.length === 0 ? (
+              <div className="flex flex-col items-center gap-3 py-12 text-center">
+                <p className="text-[13.5px] text-text-muted">Nenhuma ficha encontrada ainda.</p>
+                <button
+                  type="button"
+                  onClick={() => supabase && initialize(supabase)}
+                  className="rounded-lg border border-border px-3 py-1.5 text-[13px] font-medium text-text transition-colors hover:bg-surface-2"
+                >
+                  Tentar novamente
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {daysForVariant.map((day) => (
+                  <DayCard
+                    key={day.id}
+                    day={day}
+                    isToday={shownVariant === resolvedVariant && day.weekday === todayWeekday}
+                    onStart={() => supabase && startSession(supabase, day.id)}
+                    onEdit={() => setEditingDayId(day.id)}
+                  />
+                ))}
+              </div>
+            )}
             {shownVariant === resolvedVariant && (todayWeekday === 0 || todayWeekday === 6) && (
               <p className="px-1 text-[12.5px] text-text-faint">Fim de semana — sem treino programado.</p>
             )}

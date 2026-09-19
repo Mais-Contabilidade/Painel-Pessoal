@@ -2,13 +2,13 @@
 
 import { useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, ArrowDownCircle, ArrowUpCircle, Pencil, Sparkles, Trash2 } from "lucide-react";
+import { ArrowLeft, ArrowDownCircle, ArrowUpCircle, ChevronDown, Pencil, Sparkles, Trash2 } from "lucide-react";
 import { useFinanceStore } from "@/store/finance-store";
 import { useMounted } from "@/lib/use-mounted";
 import { useSupabase } from "@/lib/supabase-provider";
 import { computeGoalSummary, type TransactionType } from "@/lib/finance";
 import { formatBRL } from "@/lib/money";
-import { monthLabelLong } from "@/lib/month";
+import { monthLabelLong, dateToMonthKey } from "@/lib/month";
 import { formatDateShort } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -49,6 +49,7 @@ export default function GoalDetailPage() {
   const [editing, setEditing] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [txType, setTxType] = useState<TransactionType | null>(null);
+  const [showMonthAportes, setShowMonthAportes] = useState(false);
 
   const goal = goals.find((g) => g.id === params.id) ?? null;
 
@@ -59,6 +60,13 @@ export default function GoalDetailPage() {
         .filter((t) => t.goalId === params.id)
         .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
     [transactions, params.id]
+  );
+  const currentMonthAportes = useMemo(
+    () =>
+      goalTransactions.filter(
+        (t) => t.type === "aporte" && summary && dateToMonthKey(t.date) === summary.currentMonthPlan?.month
+      ),
+    [goalTransactions, summary]
   );
 
   if (!mounted) return null;
@@ -130,6 +138,43 @@ export default function GoalDetailPage() {
           )}
         </div>
       </div>
+
+      {summary.currentMonthPlan && (
+        <div className="mt-3 rounded-2xl border border-border-subtle p-3.5">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-[11.5px] font-medium text-text-faint">GUARDADO NESTE MÊS</p>
+              <p className="mt-0.5 text-[16px] font-semibold text-text">
+                <PrivateValue>{formatBRL(summary.currentMonthPlan.allocated)}</PrivateValue>
+                <span className="text-[12.5px] font-normal text-text-muted">
+                  {" "}
+                  / <PrivateValue>{formatBRL(summary.currentMonthPlan.planned)}</PrivateValue> planejado
+                </span>
+              </p>
+            </div>
+            {currentMonthAportes.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setShowMonthAportes((v) => !v)}
+                className="flex items-center gap-1 text-[12.5px] font-medium text-accent"
+              >
+                Ver aportes
+                <ChevronDown size={14} className={showMonthAportes ? "rotate-180 transition-transform" : "transition-transform"} />
+              </button>
+            )}
+          </div>
+          {showMonthAportes && (
+            <ul className="mt-2.5 space-y-1 border-t border-border-subtle pt-2.5">
+              {currentMonthAportes.map((t) => (
+                <li key={t.id} className="flex items-center justify-between text-[12.5px] text-text-muted">
+                  <span>{formatDateShort(t.date)}{t.note ? ` · ${t.note}` : ""}</span>
+                  <PrivateValue>{formatBRL(t.value)}</PrivateValue>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
 
       <div className="mt-3 grid grid-cols-3 gap-2">
         <Button variant="secondary" onClick={() => setTxType("aporte")}>

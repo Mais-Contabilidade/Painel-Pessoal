@@ -15,6 +15,7 @@ export default function EmprestadoPage() {
   const router = useRouter();
   const receivables = useReceivablesStore((s) => s.receivables);
   const payments = useReceivablesStore((s) => s.payments);
+  const installments = useReceivablesStore((s) => s.installments);
   const [creating, setCreating] = useState(false);
 
   if (!mounted) return null;
@@ -59,6 +60,7 @@ export default function EmprestadoPage() {
                 key={r.id}
                 receivable={r}
                 payments={payments.filter((p) => p.receivableId === r.id)}
+                installments={installments.filter((i) => i.receivableId === r.id)}
                 onOpen={() => router.push(`/financeiro/emprestado/${r.id}`)}
               />
             ))}

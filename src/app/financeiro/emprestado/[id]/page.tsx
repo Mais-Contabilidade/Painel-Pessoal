@@ -2,18 +2,37 @@
 
 import { useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Pencil } from "lucide-react";
 import { useReceivablesStore } from "@/store/receivables-store";
 import { useMounted } from "@/lib/use-mounted";
 import { useSupabase } from "@/lib/supabase-provider";
 import { formatBRL } from "@/lib/money";
 import { formatDateShort } from "@/lib/format";
-import { computeReceivableSummary } from "@/lib/receivables";
+import {
+  computeReceivableSummary,
+  allocateReceivableInstallments,
+  computeInstallmentPlanProgress,
+} from "@/lib/receivables";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Sheet } from "@/components/ui/sheet";
 import { PrivateValue } from "@/components/ui/private-value";
+import { MoneyInput } from "@/components/ui/money-input";
 import { ReceivablePaymentSheet } from "@/components/financeiro/receivable-payment-sheet";
+
+const INSTALLMENT_STATUS_LABEL: Record<string, string> = {
+  pago: "Pago",
+  parcial: "Parcial",
+  pendente: "Pendente",
+  atrasado: "Atrasado",
+};
+
+const INSTALLMENT_STATUS_STYLE: Record<string, string> = {
+  pago: "bg-success-soft text-success",
+  parcial: "bg-warning-soft text-warning",
+  pendente: "bg-surface-2 text-text-muted",
+  atrasado: "bg-danger-soft text-danger",
+};
 
 const STATUS_LABEL: Record<string, string> = {
   em_dia: "Em dia",
@@ -36,11 +55,15 @@ export default function ReceivableDetailPage() {
   const supabase = useSupabase();
   const receivables = useReceivablesStore((s) => s.receivables);
   const payments = useReceivablesStore((s) => s.payments);
+  const installments = useReceivablesStore((s) => s.installments);
   const deleteReceivable = useReceivablesStore((s) => s.deleteReceivable);
   const deletePayment = useReceivablesStore((s) => s.deletePayment);
+  const updateInstallmentValue = useReceivablesStore((s) => s.updateInstallmentValue);
 
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [registeringPayment, setRegisteringPayment] = useState(false);
+  const [editingInstallmentId, setEditingInstallmentId] = useState<string | null>(null);
+  const [editingValueCents, setEditingValueCents] = useState(0);
 
   const receivable = receivables.find((r) => r.id === params.id) ?? null;
   const ownPayments = useMemo(
@@ -54,6 +77,15 @@ export default function ReceivableDetailPage() {
     () => (receivable ? computeReceivableSummary(receivable, ownPayments) : null),
     [receivable, ownPayments]
   );
+  const ownInstallments = useMemo(
+    () => installments.filter((i) => i.receivableId === params.id),
+    [installments, params.id]
+  );
+  const allocations = useMemo(
+    () => (summary ? allocateReceivableInstallments(ownInstallments, summary.totalReceived) : []),
+    [ownInstallments, summary]
+  );
+  const planProgress = useMemo(() => computeInstallmentPlanProgress(allocations), [allocations]);
 
   if (!mounted) return null;
 
@@ -115,6 +147,69 @@ export default function ReceivableDetailPage() {
         {receivable.notes && <p className="mt-2 text-[13px] text-text-muted">{receivable.notes}</p>}
       </div>
 
+      {receivable.returnMode === "parcelado" && allocations.length > 0 && (
+        <div className="mt-4 rounded-2xl border border-border bg-surface p-4">
+          <div className="flex items-center justify-between">
+            <p className="text-[13px] font-medium text-text">
+              Parcelas pagas: {planProgress.paidCount}/{planProgress.totalCount}
+            </p>
+            {planProgress.overdueCount > 0 && (
+              <span className="rounded-full bg-danger-soft px-2 py-0.5 text-[11px] font-medium text-danger">
+                {planProgress.overdueCount} vencida{planProgress.overdueCount > 1 ? "s" : ""}
+              </span>
+            )}
+          </div>
+          {planProgress.nextInstallment && (
+            <p className="mt-1 text-[12.5px] text-text-muted">
+              Próxima parcela: {planProgress.nextInstallment.installmentNumber}/{planProgress.totalCount} em{" "}
+              {formatDateShort(planProgress.nextInstallment.dueDate)} ·{" "}
+              <PrivateValue>{formatBRL(planProgress.nextInstallment.remainingCents)}</PrivateValue>
+            </p>
+          )}
+
+          <ul className="mt-3 space-y-1.5">
+            {allocations.map((a) => (
+              <li
+                key={a.id}
+                className="flex items-center gap-2 rounded-xl border border-border-subtle px-3.5 py-2.5"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="text-[13px] text-text">
+                    {a.installmentNumber}/{planProgress.totalCount} · {formatDateShort(a.dueDate)}
+                  </p>
+                  <p className="text-[12px] text-text-muted">
+                    <PrivateValue>{formatBRL(a.valueCents)}</PrivateValue>
+                    {a.status === "parcial" && (
+                      <>
+                        {" "}
+                        · falta <PrivateValue>{formatBRL(a.remainingCents)}</PrivateValue>
+                      </>
+                    )}
+                  </p>
+                </div>
+                <span
+                  className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium ${INSTALLMENT_STATUS_STYLE[a.status]}`}
+                >
+                  {INSTALLMENT_STATUS_LABEL[a.status]}
+                </span>
+                {a.status !== "pago" && (
+                  <button
+                    onClick={() => {
+                      setEditingInstallmentId(a.id);
+                      setEditingValueCents(a.valueCents);
+                    }}
+                    aria-label="Ajustar valor da parcela"
+                    className="shrink-0 text-text-faint hover:text-text"
+                  >
+                    <Pencil size={13} />
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {summary.remaining > 0 && (
         <Button className="mt-3 w-full" onClick={() => setRegisteringPayment(true)}>
           <Plus size={16} />
@@ -159,6 +254,24 @@ export default function ReceivableDetailPage() {
           maxCents={summary.remaining}
           onClose={() => setRegisteringPayment(false)}
         />
+      )}
+
+      {editingInstallmentId && (
+        <Sheet onClose={() => setEditingInstallmentId(null)} title="Ajustar valor da parcela">
+          <div className="space-y-4">
+            <MoneyInput valueCents={editingValueCents} onChange={setEditingValueCents} />
+            <Button
+              className="w-full"
+              onClick={async () => {
+                if (!supabase || editingValueCents <= 0) return;
+                await updateInstallmentValue(supabase, editingInstallmentId, editingValueCents);
+                setEditingInstallmentId(null);
+              }}
+            >
+              Salvar
+            </Button>
+          </div>
+        </Sheet>
       )}
 
       {confirmDelete && (
