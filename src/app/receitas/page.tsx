@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Search, Star, X } from "lucide-react";
+import { ListChecks, Plus, Search, Star, X } from "lucide-react";
 import { useRecipesStore } from "@/store/recipes-store";
 import { useSupabase } from "@/lib/supabase-provider";
 import { useMounted } from "@/lib/use-mounted";
@@ -45,10 +45,20 @@ export default function ReceitasPage() {
       <PageHeader
         title="Receitas"
         action={
-          <Button size="sm" onClick={() => setCreating(true)}>
-            <Plus size={16} />
-            Nova
-          </Button>
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => router.push("/receitas/lista-de-compras")}
+              aria-label="Lista de compras"
+              className="flex h-9 w-9 items-center justify-center rounded-full text-text-muted hover:bg-surface-2 hover:text-text"
+            >
+              <ListChecks size={18} />
+            </button>
+            <Button size="sm" onClick={() => setCreating(true)}>
+              <Plus size={16} />
+              Nova
+            </Button>
+          </div>
         }
       />
 

@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, Clock, Pencil, Plus, Star, Trash2 } from "lucide-react";
+import { ArrowLeft, Clock, ListPlus, Pencil, Plus, Star, Trash2 } from "lucide-react";
 import { useRecipesStore } from "@/store/recipes-store";
 import { useMounted } from "@/lib/use-mounted";
 import { useSupabase } from "@/lib/supabase-provider";
@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/field";
 import { Sheet } from "@/components/ui/sheet";
 import { RecipeFormSheet } from "@/components/receitas/recipe-form-sheet";
 import { IngredientRow } from "@/components/receitas/ingredient-row";
+import { AddToListSheet } from "@/components/receitas/add-to-list-sheet";
 
 export default function RecipeDetailPage() {
   const mounted = useMounted();
@@ -26,6 +27,7 @@ export default function RecipeDetailPage() {
 
   const [editing, setEditing] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [addingToList, setAddingToList] = useState(false);
   const [newName, setNewName] = useState("");
   const [newQuantity, setNewQuantity] = useState("");
   const [newUnit, setNewUnit] = useState("");
@@ -116,7 +118,18 @@ export default function RecipeDetailPage() {
       {recipe.notes && <p className="mt-2 text-[13px] text-text-muted">{recipe.notes}</p>}
 
       <div className="mt-6">
-        <p className="mb-2 px-1 text-[12.5px] font-medium text-text-muted">Ingredientes</p>
+        <div className="mb-2 flex items-center justify-between">
+          <p className="px-1 text-[12.5px] font-medium text-text-muted">Ingredientes</p>
+          {recipeIngredients.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setAddingToList(true)}
+              className="flex items-center gap-1 text-[12.5px] font-medium text-accent"
+            >
+              <ListPlus size={14} /> Adicionar à lista
+            </button>
+          )}
+        </div>
         {recipeIngredients.length > 0 && (
           <ul className="space-y-1.5">
             {recipeIngredients.map((ing, idx) => (
@@ -158,6 +171,9 @@ export default function RecipeDetailPage() {
       )}
 
       {editing && <RecipeFormSheet recipe={recipe} onClose={() => setEditing(false)} />}
+      {addingToList && (
+        <AddToListSheet recipeId={recipe.id} ingredients={recipeIngredients} onClose={() => setAddingToList(false)} />
+      )}
 
       {confirmDelete && (
         <Sheet onClose={() => setConfirmDelete(false)} title="Excluir receita?">
