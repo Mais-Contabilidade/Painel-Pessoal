@@ -1,13 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Sheet } from "@/components/ui/sheet";
 import { Input, Label } from "@/components/ui/field";
 import { MoneyInput } from "@/components/ui/money-input";
 import { Button } from "@/components/ui/button";
+import { PrivateValue } from "@/components/ui/private-value";
 import { useFinanceStore } from "@/store/finance-store";
-import { currentMonthKey, addMonths, compareMonthKeys } from "@/lib/month";
-import type { Goal } from "@/lib/finance";
+import { currentMonthKey, addMonths, compareMonthKeys, monthsBetweenInclusive } from "@/lib/month";
+import { computeInitialMonthlyTarget, type Goal } from "@/lib/finance";
+import { formatBRL } from "@/lib/money";
 import { useSupabase } from "@/lib/supabase-provider";
 
 export function GoalFormSheet({
@@ -27,8 +29,20 @@ export function GoalFormSheet({
   const [targetValue, setTargetValue] = useState(goal?.targetValue ?? 0);
   const [startMonth, setStartMonth] = useState(goal?.startMonth ?? currentMonthKey());
   const [endMonth, setEndMonth] = useState(goal?.endMonth ?? addMonths(currentMonthKey(), 5));
+  const [initialBalance, setInitialBalance] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+
+  const preview = useMemo(() => {
+    if (targetValue <= 0 || compareMonthKeys(endMonth, startMonth) < 0) return null;
+    const totalMonths = monthsBetweenInclusive(startMonth, endMonth);
+    const remaining = Math.max(0, targetValue - initialBalance);
+    return {
+      remaining,
+      perMonth: computeInitialMonthlyTarget(targetValue, startMonth, endMonth, initialBalance),
+      totalMonths,
+    };
+  }, [targetValue, startMonth, endMonth, initialBalance]);
 
   const handleSave = async () => {
     if (!name.trim()) {
@@ -51,7 +65,13 @@ export function GoalFormSheet({
         await updateGoal(supabase, goal.id, { name: name.trim(), targetValue, startMonth, endMonth });
         onSaved?.(goal.id);
       } else {
-        const created = await addGoal(supabase, { name: name.trim(), targetValue, startMonth, endMonth });
+        const created = await addGoal(supabase, {
+          name: name.trim(),
+          targetValue,
+          startMonth,
+          endMonth,
+          initialBalance,
+        });
         onSaved?.(created.id);
       }
       onClose();
@@ -95,6 +115,24 @@ export function GoalFormSheet({
             />
           </div>
         </div>
+
+        {!goal && (
+          <div>
+            <Label>Saldo já guardado (opcional)</Label>
+            <MoneyInput valueCents={initialBalance} onChange={setInitialBalance} />
+          </div>
+        )}
+
+        {preview && (
+          <div className="rounded-lg bg-accent-soft px-3 py-2.5 text-[13px] text-accent">
+            <p>
+              Restante: <PrivateValue>{formatBRL(preview.remaining)}</PrivateValue>
+            </p>
+            <p className="mt-0.5">
+              Necessário por mês: <PrivateValue>{formatBRL(preview.perMonth)}</PrivateValue> ({preview.totalMonths} meses)
+            </p>
+          </div>
+        )}
 
         {error && <p className="text-[13px] text-danger">{error}</p>}
 

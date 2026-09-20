@@ -2,36 +2,50 @@
 
 import { useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, ArrowDownCircle, ArrowUpCircle, ChevronDown, Pencil, Sparkles, Trash2 } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowDownCircle,
+  ArrowUpCircle,
+  ChevronDown,
+  Pencil,
+  PiggyBank,
+  Sparkles,
+  Trash2,
+} from "lucide-react";
 import { useFinanceStore } from "@/store/finance-store";
 import { useMounted } from "@/lib/use-mounted";
 import { useSupabase } from "@/lib/supabase-provider";
-import { computeGoalSummary, type TransactionType } from "@/lib/finance";
+import { computeGoalSummary, type Transaction, type TransactionType } from "@/lib/finance";
 import { formatBRL } from "@/lib/money";
 import { monthLabelLong, dateToMonthKey } from "@/lib/month";
 import { formatDateShort } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Sheet } from "@/components/ui/sheet";
-import { PrivateValue } from "@/components/ui/private-value";
+import { PrivateValue, PrivatePercent } from "@/components/ui/private-value";
 import { MonthRow } from "@/components/financeiro/month-row";
 import { GoalFormSheet } from "@/components/financeiro/goal-form-sheet";
 import { TransactionSheet } from "@/components/financeiro/transaction-sheet";
+import { DeleteTransactionSheet } from "@/components/financeiro/delete-transaction-sheet";
+import { ParticipantsSection } from "@/components/financeiro/participants-section";
 
 const TX_ICON: Record<TransactionType, typeof ArrowUpCircle> = {
   aporte: ArrowUpCircle,
+  saldo_inicial: PiggyBank,
   rendimento: Sparkles,
   retirada: ArrowDownCircle,
 };
 
 const TX_COLOR: Record<TransactionType, string> = {
   aporte: "text-success",
+  saldo_inicial: "text-text-muted",
   rendimento: "text-accent",
   retirada: "text-danger",
 };
 
 const TX_LABEL: Record<TransactionType, string> = {
   aporte: "Aporte",
+  saldo_inicial: "Saldo inicial",
   rendimento: "Rendimento",
   retirada: "Retirada",
 };
@@ -43,12 +57,14 @@ export default function GoalDetailPage() {
   const supabase = useSupabase();
   const goals = useFinanceStore((s) => s.goals);
   const transactions = useFinanceStore((s) => s.transactions);
+  const participants = useFinanceStore((s) => s.participants);
   const deleteGoal = useFinanceStore((s) => s.deleteGoal);
-  const deleteTransaction = useFinanceStore((s) => s.deleteTransaction);
 
   const [editing, setEditing] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [txType, setTxType] = useState<TransactionType | null>(null);
+  const [editingTx, setEditingTx] = useState<Transaction | null>(null);
+  const [deletingTx, setDeletingTx] = useState<Transaction | null>(null);
   const [showMonthAportes, setShowMonthAportes] = useState(false);
 
   const goal = goals.find((g) => g.id === params.id) ?? null;
@@ -61,6 +77,7 @@ export default function GoalDetailPage() {
         .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
     [transactions, params.id]
   );
+  const goalParticipants = useMemo(() => participants.filter((p) => p.goalId === params.id), [participants, params.id]);
   const currentMonthAportes = useMemo(
     () =>
       goalTransactions.filter(
@@ -82,7 +99,16 @@ export default function GoalDetailPage() {
     );
   }
 
-  const pct = summary.targetValue > 0 ? (summary.totalAllocated / summary.targetValue) * 100 : 0;
+  const pct = summary.targetValue > 0 ? (summary.saldoAtual / summary.targetValue) * 100 : 0;
+  const barPct = Math.min(100, pct);
+
+  const previsao = summary.isCompleted
+    ? summary.excedente > 0
+      ? `Meta concluída · excedente de ${formatBRL(summary.excedente)}`
+      : "Meta concluída"
+    : summary.isOverdue
+      ? `Meta vencida · faltam ${formatBRL(summary.totalRemaining)}`
+      : `No ritmo atual: guardar ${formatBRL(summary.necessidadeMensalAtual)}/mês até ${monthLabelLong(goal.endMonth)}`;
 
   return (
     <div className="px-5 pt-6 pb-8">
@@ -120,16 +146,22 @@ export default function GoalDetailPage() {
       <div className="mt-4 rounded-2xl border border-border bg-surface p-4">
         <div className="flex items-baseline justify-between">
           <p className="text-[22px] font-semibold text-text">
-            <PrivateValue>{formatBRL(summary.totalAllocated)}</PrivateValue>
+            <PrivateValue>{formatBRL(summary.saldoAtual)}</PrivateValue>
           </p>
           <p className="text-[13px] text-text-muted">
             de <PrivateValue>{formatBRL(summary.targetValue)}</PrivateValue>
           </p>
         </div>
-        <Progress value={pct} className="mt-2.5" />
+        <Progress value={barPct} className="mt-2.5" />
         <div className="mt-3 flex items-center justify-between text-[12.5px] text-text-muted">
           <span>
-            Falta <PrivateValue>{formatBRL(summary.totalRemaining)}</PrivateValue>
+            <PrivatePercent>{`${Math.round(pct)}%`}</PrivatePercent>
+            {summary.excedente > 0 && (
+              <>
+                {" "}
+                · excedente <PrivateValue>{formatBRL(summary.excedente)}</PrivateValue>
+              </>
+            )}
           </span>
           {summary.totalRendimentos > 0 && (
             <span className="text-accent">
@@ -137,6 +169,26 @@ export default function GoalDetailPage() {
             </span>
           )}
         </div>
+        {!summary.isCompleted && (
+          <p className="mt-2 text-[12.5px] text-text-muted">
+            Falta <PrivateValue>{formatBRL(summary.totalRemaining)}</PrivateValue>
+          </p>
+        )}
+      </div>
+
+      <div className="mt-3 rounded-2xl border border-border-subtle p-3.5">
+        <p className="text-[11.5px] font-medium text-text-faint">PLANEJAMENTO ATUAL</p>
+        <p className="mt-0.5 text-[16px] font-semibold text-text">
+          <PrivateValue>{formatBRL(summary.necessidadeMensalAtual)}</PrivateValue>
+          <span className="text-[12.5px] font-normal text-text-muted">/mês</span>
+        </p>
+        {summary.isReajustado && (
+          <p className="mt-0.5 text-[12px] text-text-faint">
+            Original: <PrivateValue>{formatBRL(summary.planoOriginalMensal)}</PrivateValue>/mês · reajustado após
+            movimentações
+          </p>
+        )}
+        <p className="mt-2 text-[12.5px] text-text-muted">{previsao}</p>
       </div>
 
       {summary.currentMonthPlan && (
@@ -145,10 +197,10 @@ export default function GoalDetailPage() {
             <div>
               <p className="text-[11.5px] font-medium text-text-faint">GUARDADO NESTE MÊS</p>
               <p className="mt-0.5 text-[16px] font-semibold text-text">
-                <PrivateValue>{formatBRL(summary.currentMonthPlan.allocated)}</PrivateValue>
+                <PrivateValue>{formatBRL(summary.currentMonthPlan.aportado)}</PrivateValue>
                 <span className="text-[12.5px] font-normal text-text-muted">
                   {" "}
-                  / <PrivateValue>{formatBRL(summary.currentMonthPlan.planned)}</PrivateValue> planejado
+                  / <PrivateValue>{formatBRL(summary.currentMonthPlan.planned ?? 0)}</PrivateValue> planejado
                 </span>
               </p>
             </div>
@@ -188,6 +240,8 @@ export default function GoalDetailPage() {
         </Button>
       </div>
 
+      <ParticipantsSection goal={goal} participants={goalParticipants} transactions={transactions} />
+
       <div className="mt-6">
         <p className="mb-2 px-1 text-[12.5px] font-medium text-text-muted">Planejamento mensal</p>
         <div className="divide-y divide-border-subtle rounded-2xl border border-border bg-surface">
@@ -203,6 +257,7 @@ export default function GoalDetailPage() {
           <ul className="space-y-1.5">
             {goalTransactions.map((t) => {
               const Icon = TX_ICON[t.type];
+              const participant = goalParticipants.find((p) => p.id === t.participantId);
               return (
                 <li
                   key={t.id}
@@ -214,12 +269,21 @@ export default function GoalDetailPage() {
                       {TX_LABEL[t.type]} · <PrivateValue>{formatBRL(t.value)}</PrivateValue>
                     </p>
                     <p className="truncate text-[12px] text-text-muted">
-                      {formatDateShort(t.date)}
+                      {formatDateShort(t.date)} ·{" "}
+                      {t.type === "rendimento" ? "CDI" : participant ? participant.name : "Não informado"}
+                      {t.source && ` · ${t.source}`}
                       {(t.note || t.justification) && ` · ${t.note ?? t.justification}`}
                     </p>
                   </div>
                   <button
-                    onClick={() => supabase && deleteTransaction(supabase, t.id)}
+                    onClick={() => setEditingTx(t)}
+                    aria-label="Editar lançamento"
+                    className="shrink-0 text-text-faint hover:text-text"
+                  >
+                    <Pencil size={13} />
+                  </button>
+                  <button
+                    onClick={() => setDeletingTx(t)}
                     aria-label="Remover lançamento"
                     className="shrink-0 text-text-faint hover:text-danger"
                   >
@@ -233,14 +297,34 @@ export default function GoalDetailPage() {
       )}
 
       {editing && <GoalFormSheet goal={goal} onClose={() => setEditing(false)} />}
-      {txType && (
-        <TransactionSheet goal={goal} initialType={txType} onClose={() => setTxType(null)} />
+      {txType && <TransactionSheet goal={goal} initialType={txType} onClose={() => setTxType(null)} />}
+      {editingTx && (
+        <TransactionSheet
+          goal={goal}
+          initialType={editingTx.type}
+          transaction={editingTx}
+          onClose={() => setEditingTx(null)}
+        />
+      )}
+      {deletingTx && (
+        <DeleteTransactionSheet
+          transaction={deletingTx}
+          participant={goalParticipants.find((p) => p.id === deletingTx.participantId) ?? null}
+          onClose={() => setDeletingTx(null)}
+        />
       )}
 
       {confirmDelete && (
         <Sheet onClose={() => setConfirmDelete(false)} title="Excluir meta?">
-          <p className="text-[14px] text-text-muted">
-            Isso apaga a meta e todos os lançamentos associados a ela. Essa ação não pode ser desfeita.
+          <div className="rounded-xl border border-border-subtle px-3.5 py-3">
+            <p className="text-[14px] font-medium text-text">{goal.name}</p>
+            <p className="mt-0.5 text-[13px] text-text-muted">
+              Saldo: <PrivateValue>{formatBRL(summary.saldoAtual)}</PrivateValue> · {goalTransactions.length} lançamento
+              {goalTransactions.length === 1 ? "" : "s"}
+            </p>
+          </div>
+          <p className="mt-3 text-[13px] text-text-muted">
+            Isso apaga a meta, os lançamentos e os participantes associados a ela. Essa ação não pode ser desfeita.
           </p>
           <div className="mt-4 flex gap-2">
             <Button variant="secondary" className="flex-1" onClick={() => setConfirmDelete(false)}>
