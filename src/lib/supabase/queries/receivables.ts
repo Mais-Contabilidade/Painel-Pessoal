@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { ReceivableRow, ReceivablePaymentRow } from "@/lib/supabase/types";
+import type { ReceivableRow, ReceivablePaymentRow, ReceivableInstallmentRow, ReceivableReturnMode } from "@/lib/supabase/types";
+import { generateInstallmentSchedule } from "@/lib/receivables";
 
 export async function fetchReceivables(supabase: SupabaseClient): Promise<ReceivableRow[]> {
   const { data, error } = await supabase
@@ -22,7 +23,16 @@ export async function fetchReceivablePayments(supabase: SupabaseClient): Promise
 export async function insertReceivable(
   supabase: SupabaseClient,
   userId: string,
-  input: { person: string; originalValueCents: number; lentOn: string; agreedReturnDate: string | null; notes?: string }
+  input: {
+    person: string;
+    originalValueCents: number;
+    lentOn: string;
+    agreedReturnDate: string | null;
+    notes?: string;
+    returnMode?: ReceivableReturnMode;
+    installmentsCount?: number | null;
+    firstDueDate?: string | null;
+  }
 ): Promise<ReceivableRow> {
   const { data, error } = await supabase
     .from("receivables")
@@ -33,11 +43,53 @@ export async function insertReceivable(
       lent_on: input.lentOn,
       agreed_return_date: input.agreedReturnDate,
       notes: input.notes || null,
+      return_mode: input.returnMode ?? "avista",
+      installments_count: input.installmentsCount ?? null,
+      first_due_date: input.firstDueDate ?? null,
     })
     .select()
     .single();
   if (error) throw new Error(error.message);
-  return data as ReceivableRow;
+  const receivable = data as ReceivableRow;
+
+  if (input.returnMode === "parcelado" && input.installmentsCount && input.firstDueDate) {
+    const schedule = generateInstallmentSchedule(input.originalValueCents, input.installmentsCount, input.firstDueDate);
+    const rows = schedule.map((s) => ({
+      user_id: userId,
+      receivable_id: receivable.id,
+      installment_number: s.installmentNumber,
+      due_date: s.dueDate,
+      value_cents: s.valueCents,
+    }));
+    const { error: instError } = await supabase.from("receivable_installments").insert(rows);
+    if (instError) throw new Error(instError.message);
+  }
+
+  return receivable;
+}
+
+export async function fetchReceivableInstallments(supabase: SupabaseClient): Promise<ReceivableInstallmentRow[]> {
+  const { data, error } = await supabase
+    .from("receivable_installments")
+    .select("*")
+    .order("installment_number", { ascending: true });
+  if (error) throw new Error(error.message);
+  return data as ReceivableInstallmentRow[];
+}
+
+export async function updateReceivableInstallmentValue(
+  supabase: SupabaseClient,
+  id: string,
+  valueCents: number
+): Promise<ReceivableInstallmentRow> {
+  const { data, error } = await supabase
+    .from("receivable_installments")
+    .update({ value_cents: valueCents })
+    .eq("id", id)
+    .select()
+    .single();
+  if (error) throw new Error(error.message);
+  return data as ReceivableInstallmentRow;
 }
 
 export async function updateReceivableRow(

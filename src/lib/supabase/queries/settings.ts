@@ -22,3 +22,11 @@ export async function updateCardioDefaultGoal(supabase: SupabaseClient, userId: 
     .eq("user_id", userId);
   if (error) throw new Error(error.message);
 }
+
+export async function updateHideFinancialValues(supabase: SupabaseClient, userId: string, hide: boolean) {
+  const { error } = await supabase
+    .from("user_settings")
+    .update({ hide_financial_values: hide })
+    .eq("user_id", userId);
+  if (error) throw new Error(error.message);
+}

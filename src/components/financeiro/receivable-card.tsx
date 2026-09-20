@@ -1,6 +1,15 @@
-import { PrivateValue } from "@/components/ui/private-value";
+import { Progress } from "@/components/ui/progress";
+import { PrivateValue, PrivatePercent } from "@/components/ui/private-value";
 import { formatBRL } from "@/lib/money";
-import { computeReceivableSummary, type Receivable, type ReceivablePayment } from "@/lib/receivables";
+import { formatDateShort } from "@/lib/format";
+import {
+  computeReceivableSummary,
+  allocateReceivableInstallments,
+  computeInstallmentPlanProgress,
+  type Receivable,
+  type ReceivablePayment,
+  type ReceivableInstallment,
+} from "@/lib/receivables";
 
 const STATUS_LABEL: Record<string, string> = {
   em_dia: "Em dia",
@@ -19,13 +28,20 @@ const STATUS_STYLE: Record<string, string> = {
 export function ReceivableCard({
   receivable,
   payments,
+  installments,
   onOpen,
 }: {
   receivable: Receivable;
   payments: ReceivablePayment[];
+  installments: ReceivableInstallment[];
   onOpen: () => void;
 }) {
   const summary = computeReceivableSummary(receivable, payments);
+  const pct = receivable.originalValueCents > 0 ? (summary.totalReceived / receivable.originalValueCents) * 100 : 0;
+
+  const allocations =
+    receivable.returnMode === "parcelado" ? allocateReceivableInstallments(installments, summary.totalReceived) : [];
+  const planProgress = computeInstallmentPlanProgress(allocations);
 
   return (
     <button
@@ -43,6 +59,25 @@ export function ReceivableCard({
         <PrivateValue>{`Falta ${formatBRL(summary.remaining)}`}</PrivateValue> de{" "}
         <PrivateValue>{formatBRL(receivable.originalValueCents)}</PrivateValue>
       </p>
+      <div className="mt-2 flex items-center gap-2">
+        <Progress value={pct} className="flex-1" />
+        <span className="shrink-0 text-[12px] text-text-muted">
+          <PrivatePercent>{`${Math.round(pct)}%`}</PrivatePercent>
+        </span>
+      </div>
+      {receivable.returnMode === "parcelado" && planProgress.totalCount > 0 && (
+        <div className="mt-1.5 flex items-center justify-between text-[12px] text-text-faint">
+          <span>
+            {planProgress.paidCount}/{planProgress.totalCount} parcelas
+            {planProgress.nextInstallment && ` · próxima ${formatDateShort(planProgress.nextInstallment.dueDate)}`}
+          </span>
+          {planProgress.overdueCount > 0 && (
+            <span className="text-danger">
+              {planProgress.overdueCount} vencida{planProgress.overdueCount > 1 ? "s" : ""}
+            </span>
+          )}
+        </div>
+      )}
     </button>
   );
 }
