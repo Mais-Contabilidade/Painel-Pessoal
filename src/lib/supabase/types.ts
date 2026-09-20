@@ -208,6 +208,92 @@ export type JournalEntryRow = {
   updated_at: string;
 };
 
+export type LibraryItemKind = "book" | "movie_show" | "course";
+
+export type LibraryItemRow = {
+  id: string;
+  user_id: string;
+  kind: LibraryItemKind;
+  title: string;
+  subtitle: string | null;
+  cover_url: string | null;
+  status: string;
+  rating: number | null;
+  favorite: boolean;
+  started_on: string | null;
+  finished_on: string | null;
+  progress_percent: number | null;
+  tags: string[];
+  external_source: string | null;
+  external_id: string | null;
+  metadata: { next_action?: string; media_type?: "filme" | "serie" };
+  created_at: string;
+  updated_at: string;
+};
+
+export type LibraryNoteType = "ponto_principal" | "aprendizado" | "citacao" | "aplicacao" | "comentario";
+
+export type LibraryNoteRow = {
+  id: string;
+  user_id: string;
+  item_id: string;
+  note_type: LibraryNoteType;
+  title: string | null;
+  content: string;
+  created_at: string;
+};
+
+export type RecipeCategory = "salgado" | "doce" | "bebida" | "lanche" | "molho_acompanhamento" | "outro";
+
+export type RecipeRow = {
+  id: string;
+  user_id: string;
+  name: string;
+  photo_url: string | null;
+  category: RecipeCategory;
+  tags: string[];
+  prep_time_minutes: number | null;
+  servings: string | null;
+  difficulty: string | null;
+  rating: number | null;
+  notes: string | null;
+  instructions: string | null;
+  status: string;
+  favorite: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type RecipeIngredientRow = {
+  id: string;
+  user_id: string;
+  recipe_id: string;
+  name: string;
+  quantity: number | null;
+  unit: string | null;
+  order_index: number;
+  created_at: string;
+};
+
+export type ShoppingListRow = {
+  id: string;
+  user_id: string;
+  name: string;
+  created_at: string;
+};
+
+export type ShoppingListItemRow = {
+  id: string;
+  user_id: string;
+  list_id: string;
+  name: string;
+  quantity: number | null;
+  unit: string | null;
+  checked: boolean;
+  source_recipe_id: string | null;
+  created_at: string;
+};
+
 export type InsightRow = {
   id: string;
   user_id: string;
