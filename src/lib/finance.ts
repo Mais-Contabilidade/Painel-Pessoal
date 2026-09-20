@@ -120,9 +120,10 @@ export function computeGoalSummary(goal: Goal, allTransactions: Transaction[], t
   const isCompleted = totalRemaining <= 0;
 
   const monthKeys = enumerateMonths(goal.startMonth, goal.endMonth);
-  const totalMonths = monthKeys.length;
 
-  const planoOriginalMensal = goal.originalMonthlyTargetCents ?? Math.round(goal.targetValue / totalMonths);
+  const planoOriginalMensal =
+    goal.originalMonthlyTargetCents ??
+    computeInitialMonthlyTarget(goal.targetValue, goal.startMonth, goal.endMonth, saldoInicial);
 
   const remainingMonthKeys = monthKeys.filter((m) => compareMonthKeys(m, nowKey) >= 0);
   const mesesRestantesCount = remainingMonthKeys.length;
@@ -219,11 +220,49 @@ export function computeParticipantContributions(
       personalTarget = Math.round(goal.targetValue / participants.length);
     } else if (goal.allocationType === "percentual" && p.sharePercent != null) {
       personalTarget = Math.round((goal.targetValue * p.sharePercent) / 100);
+    } else if (goal.allocationType === "valor_mensal" && p.monthlyTargetCents != null) {
+      const totalMonths = enumerateMonths(goal.startMonth, goal.endMonth).length;
+      personalTarget = p.monthlyTargetCents * totalMonths;
     }
 
     const remaining = personalTarget != null ? Math.max(0, personalTarget - contributed) : null;
     return { participant: p, contributed, personalTarget, remaining };
   });
+}
+
+/** Soma de percentuais dos participantes — o estado válido em "percentual" é exatamente 100%. */
+export function sumSharePercent(participants: GoalParticipant[]): number {
+  return participants.reduce((acc, p) => acc + (p.sharePercent ?? 0), 0);
+}
+
+/**
+ * Distribui 100% igualmente entre N participantes (precisão de 0,01%), jogando o resto de
+ * centésimos no último — usado para preencher automaticamente ao entrar no modo percentual.
+ */
+export function distributeEvenPercent(count: number): number[] {
+  if (count <= 0) return [];
+  const totalHundredths = 10000; // 100,00%
+  const base = Math.floor(totalHundredths / count);
+  const result = Array.from({ length: count }, () => base);
+  result[count - 1] += totalHundredths - base * count;
+  return result.map((v) => v / 100);
+}
+
+export type ValorMensalProjection = {
+  totalProjectedCents: Cents;
+  deficit: Cents;
+  excess: Cents;
+};
+
+/** Projeta se a soma dos valores mensais dos participantes cobre a meta dentro do prazo. */
+export function computeValorMensalProjection(goal: Goal, participants: GoalParticipant[]): ValorMensalProjection {
+  const totalMonths = enumerateMonths(goal.startMonth, goal.endMonth).length;
+  const totalProjectedCents = participants.reduce((acc, p) => acc + (p.monthlyTargetCents ?? 0), 0) * totalMonths;
+  return {
+    totalProjectedCents,
+    deficit: Math.max(0, goal.targetValue - totalProjectedCents),
+    excess: Math.max(0, totalProjectedCents - goal.targetValue),
+  };
 }
 
 export type MovementImpact = {

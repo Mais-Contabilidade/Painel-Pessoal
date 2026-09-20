@@ -4,11 +4,24 @@ import { useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/field";
 import { Chip } from "@/components/ui/chip";
-import { PrivateValue } from "@/components/ui/private-value";
+import { PrivateValue, PrivatePercent } from "@/components/ui/private-value";
 import { formatBRL } from "@/lib/money";
 import { useFinanceStore } from "@/store/finance-store";
 import { useSupabase } from "@/lib/supabase-provider";
-import { computeParticipantContributions, type Goal, type GoalParticipant, type GoalAllocationType, type Transaction } from "@/lib/finance";
+import {
+  computeParticipantContributions,
+  computeValorMensalProjection,
+  distributeEvenPercent,
+  sumSharePercent,
+  type Goal,
+  type GoalParticipant,
+  type GoalAllocationType,
+  type Transaction,
+} from "@/lib/finance";
+
+function formatPercent(value: number): string {
+  return `${value.toFixed(2).replace(/\.?0+$/, "")}%`;
+}
 
 const ALLOCATION_OPTIONS: { value: GoalAllocationType; label: string }[] = [
   { value: "livre", label: "Livre" },
@@ -35,11 +48,36 @@ export function ParticipantsSection({
   const [newName, setNewName] = useState("");
 
   const contributions = computeParticipantContributions(goal, participants, transactions);
+  const percentSum = sumSharePercent(participants);
+  const percentValid = Math.abs(percentSum - 100) < 0.01;
+  const projection = goal.allocationType === "valor_mensal" ? computeValorMensalProjection(goal, participants) : null;
 
   const handleAdd = async () => {
     if (!supabase || !newName.trim()) return;
     await addParticipant(supabase, goal.id, { name: newName.trim(), sharePercent: null, monthlyTargetCents: null });
     setNewName("");
+  };
+
+  const handleSelectAllocation = async (value: GoalAllocationType) => {
+    if (!supabase) return;
+    if (
+      value === "percentual" &&
+      goal.allocationType !== "percentual" &&
+      participants.length > 0 &&
+      participants.every((p) => p.sharePercent == null)
+    ) {
+      const shares = distributeEvenPercent(participants.length);
+      await Promise.all(
+        participants.map((p, i) =>
+          updateParticipant(supabase, p.id, {
+            name: p.name,
+            sharePercent: shares[i],
+            monthlyTargetCents: p.monthlyTargetCents,
+          })
+        )
+      );
+    }
+    await setAllocationType(supabase, goal.id, value);
   };
 
   return (
@@ -51,12 +89,39 @@ export function ParticipantsSection({
           <Chip
             key={o.value}
             active={goal.allocationType === o.value}
-            onClick={() => supabase && setAllocationType(supabase, goal.id, o.value)}
+            onClick={() => handleSelectAllocation(o.value)}
           >
             {o.label}
           </Chip>
         ))}
       </div>
+
+      {goal.allocationType === "percentual" && participants.length > 0 && (
+        <p className={`mb-2 px-1 text-[12.5px] font-medium ${percentValid ? "text-success" : "text-warning"}`}>
+          Soma: <PrivatePercent>{formatPercent(percentSum)}</PrivatePercent>
+          {!percentValid && (
+            <>
+              {" · "}
+              {percentSum < 100 ? "Faltam " : "Excede "}
+              <PrivatePercent>{formatPercent(Math.abs(100 - percentSum))}</PrivatePercent>
+            </>
+          )}
+        </p>
+      )}
+
+      {projection && participants.length > 0 && (projection.deficit > 0 || projection.excess > 0) && (
+        <p className="mb-2 px-1 text-[12.5px] font-medium text-warning">
+          {projection.deficit > 0 ? (
+            <>
+              Com essa divisão, faltam <PrivateValue>{formatBRL(projection.deficit)}</PrivateValue> para cobrir a meta.
+            </>
+          ) : (
+            <>
+              Com essa divisão, o projetado excede a meta em <PrivateValue>{formatBRL(projection.excess)}</PrivateValue>.
+            </>
+          )}
+        </p>
+      )}
 
       {contributions.length > 0 && (
         <ul className="space-y-1.5">
