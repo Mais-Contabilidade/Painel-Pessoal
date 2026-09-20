@@ -101,6 +101,8 @@ export type ProfileRow = {
   updated_at: string;
 };
 
+export type FinancialGoalAllocationType = "livre" | "igual" | "percentual" | "valor_mensal";
+
 export type FinancialGoalRow = {
   id: string;
   user_id: string;
@@ -108,12 +110,26 @@ export type FinancialGoalRow = {
   target_value_cents: number;
   start_month: string;
   end_month: string;
+  allocation_type: FinancialGoalAllocationType;
+  original_monthly_target_cents: number | null;
   archived: boolean;
   created_at: string;
   updated_at: string;
 };
 
-export type FinancialTransactionType = "aporte" | "rendimento" | "retirada";
+export type FinancialGoalParticipantRow = {
+  id: string;
+  user_id: string;
+  goal_id: string;
+  name: string;
+  share_percent: number | null;
+  monthly_target_cents: number | null;
+  order_index: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type FinancialTransactionType = "aporte" | "saldo_inicial" | "rendimento" | "retirada";
 
 export type FinancialTransactionRow = {
   id: string;
@@ -122,6 +138,8 @@ export type FinancialTransactionRow = {
   type: FinancialTransactionType;
   value_cents: number;
   occurred_on: string;
+  participant_id: string | null;
+  source: string | null;
   note: string | null;
   justification: string | null;
   created_at: string;
